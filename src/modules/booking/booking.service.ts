@@ -36,6 +36,13 @@ export class BookingService {
     return this.slotRepo.find({ where: { trainerId, status: 'open' } });
   }
 
+  // NEW — for customers using a paid PT package, slots are restricted to
+  // only the trainer that package is locked to
+  async getSlotsForPackage(packageId: string) {
+    const trainerId = await this.membershipService.getPackageTrainerId(packageId);
+    return this.slotRepo.find({ where: { trainerId, status: 'open' } });
+  }
+
   async getCustomerBookings(customerId: string) {
     return this.bookingRepo.find({
       where: { customerId },
@@ -80,12 +87,30 @@ export class BookingService {
   }
 
   private async createPtSessionBooking(dto: CreateBookingDto) {
-    const hasCredit = await this.membershipService.checkPtSessionsAvailable(dto.customerId);
-    if (!hasCredit) throw new BadRequestException('No PT sessions remaining on membership');
-
     const slot = await this.slotRepo.findOne({ where: { id: dto.trainerSlotId } });
     if (!slot || slot.status !== 'open') {
       throw new ConflictException('This trainer slot is no longer available');
+    }
+
+    // sessionSource is required by the DTO whenever type = 'pt_session',
+    // so by this point it's guaranteed to be either 'membership' or 'package'
+    if (dto.sessionSource === 'membership') {
+      const hasCredit = await this.membershipService.checkPtSessionsAvailable(dto.customerId);
+      if (!hasCredit) {
+        throw new BadRequestException('No free PT sessions remaining on membership');
+      }
+      // any trainer allowed — no extra check needed
+    } else {
+      const hasCredit = await this.membershipService.checkPackageSessionsAvailable(dto.ptPackageId!);
+      if (!hasCredit) {
+        throw new BadRequestException('No sessions remaining in this package');
+      }
+
+      // package is locked to one specific trainer
+      const packageTrainerId = await this.membershipService.getPackageTrainerId(dto.ptPackageId!);
+      if (slot.trainerId !== packageTrainerId) {
+        throw new BadRequestException('This package can only be used with your assigned trainer');
+      }
     }
 
     const booking = await this.dataSource.transaction(async (manager) => {
@@ -96,11 +121,17 @@ export class BookingService {
           trainerSlotId: dto.trainerSlotId,
           type: 'pt_session',
           status: 'confirmed',
+          sessionSource: dto.sessionSource,
+          ptPackageId: dto.ptPackageId ?? null,
         }),
       );
     });
 
-    await this.membershipService.deductPtSession(dto.customerId);
+    if (dto.sessionSource === 'membership') {
+      await this.membershipService.deductPtSession(dto.customerId);
+    } else {
+      await this.membershipService.deductPackageSession(dto.ptPackageId!);
+    }
 
     await this.events.publish('SessionBooked', {
       bookingId: booking.id,
@@ -123,7 +154,11 @@ export class BookingService {
     });
 
     if (booking.type === 'pt_session') {
-      await this.membershipService.refundPtSession(booking.customerId);
+      if (booking.sessionSource === 'package' && booking.ptPackageId) {
+        await this.membershipService.refundPackageSession(booking.ptPackageId);
+      } else {
+        await this.membershipService.refundPtSession(booking.customerId);
+      }
     }
 
     await this.events.publish('SessionCancelled', { bookingId });
@@ -131,7 +166,7 @@ export class BookingService {
   }
 
   // --- Admin/Trainer: catalog & availability management ---
-  
+
   async createClass(dto: CreateClassDto) {
     return this.classRepo.save(this.classRepo.create(dto));
   }
@@ -210,6 +245,8 @@ export class BookingService {
           classSessionId: newClassSessionId ?? null,
           trainerSlotId: newTrainerSlotId ?? null,
           status: 'confirmed',
+          sessionSource: booking.sessionSource,
+          ptPackageId: booking.ptPackageId,
         }),
       );
     });
