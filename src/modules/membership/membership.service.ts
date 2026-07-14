@@ -879,5 +879,9 @@ async getPackageTrainerId(
  return ptPackage.trainerId;
 
 }
-
+async checkActiveMembership(
+  customerId: string,
+): Promise<void> {
+  await this.getActiveMembership(customerId);
+}
 }
