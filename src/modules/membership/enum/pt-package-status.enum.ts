@@ -1,0 +1,11 @@
+export enum PtPackageStatus {
+
+  PENDING_PAYMENT='PENDING_PAYMENT',
+
+  ACTIVE='ACTIVE',
+
+  EXHAUSTED='EXHAUSTED',
+
+  EXPIRED='EXPIRED',
+
+}
