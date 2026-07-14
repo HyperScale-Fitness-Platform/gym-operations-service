@@ -32,10 +32,6 @@ import { OccupancyModule } from './modules/occupancy/occupancy.module';
 
       synchronize: false,
 
-      migrations: [
-        'src/migrations/*.ts'
-      ],
-
     }),
     BookingModule,
     MembershipModule,
