@@ -70,38 +70,6 @@ export class MembershipController {
         return this.membershipService.unfreezeMembership(membershipId);
     }
 
-
-
-@Get('customers/:id/pt-sessions/check')
-checkPtSessions(
-  @Param('id') customerId: string,
-) {
-  return this.membershipService.checkPtSessionsAvailable(
-    customerId,
-  );
-}
-
-
-
-@Post('customers/:id/pt-sessions/deduct')
-deductPtSession(
-  @Param('id') customerId: string,
-) {
-  return this.membershipService.deductPtSession(
-    customerId,
-  );
-}
-
-
-@Post('customers/:id/pt-sessions/refund')
-refundPtSession(
-  @Param('id') customerId: string,
-) {
-  return this.membershipService.refundPtSession(
-    customerId,
-  );
-}
-
 @Post('pt-packages/purchase')
 purchasePackage(
  @Body() dto:CreatePtPackageDto
@@ -124,41 +92,4 @@ getCustomerPackages(
   return this.membershipService.getCustomerPackages(customerId);
 
 }
-
-@Get('pt-packages/:id/sessions/check')
-checkPackageSessions(
-  @Param('id') packageId: string,
-) {
-  return this.membershipService.checkPackageSessionsAvailable(
-    packageId,
-  );
-}
-
-@Post('pt-packages/:id/sessions/deduct')
-deductPackageSession(
-  @Param('id') packageId: string,
-) {
-  return this.membershipService.deductPackageSession(
-    packageId,
-  );
-}
-
-@Post('pt-packages/:id/sessions/refund')
-refundPackageSession(
-  @Param('id') packageId: string,
-) {
-  return this.membershipService.refundPackageSession(
-    packageId,
-  );
-}
-
-@Get('pt-packages/:id/trainer')
-getPackageTrainer(
-  @Param('id') packageId: string,
-) {
-  return this.membershipService.getPackageTrainerId(
-    packageId,
-  );
-}
-
 }

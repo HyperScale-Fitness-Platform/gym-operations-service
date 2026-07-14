@@ -31,11 +31,6 @@ import { OccupancyModule } from './modules/occupancy/occupancy.module';
       autoLoadEntities: true,
 
       synchronize: false,
-
-      migrations: [
-        'src/migrations/*.ts'
-      ],
-
     }),
     BookingModule,
     MembershipModule,

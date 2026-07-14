@@ -16,6 +16,24 @@ import { PtPackageStatus } from './enum/pt-package-status.enum';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
 
 
+// STUB — your friend (Person 2) replaces the bodies of these functions
+// with real Prisma/TypeORM queries against the memberships and pt_packages
+// tables. Booking module calls these and only these — keep this the shared
+// contract, don't let Booking reach into Membership's other internals.
+//
+// Agreed signatures (do not change without telling Person 1 / Booking owner):
+//
+// -- Free membership-included PT sessions (any trainer) --
+//   checkPtSessionsAvailable(customerId: string): Promise<boolean>
+//   deductPtSession(customerId: string): Promise<void>
+//   refundPtSession(customerId: string): Promise<void>
+//
+// -- Paid PT packages (locked to one specific trainer) --
+//   checkPackageSessionsAvailable(packageId: string): Promise<boolean>
+//   deductPackageSession(packageId: string): Promise<void>
+//   refundPackageSession(packageId: string): Promise<void>
+//   getPackageTrainerId(packageId: string): Promise<string>
+
 @Injectable()
 export class MembershipService {
   constructor(
@@ -861,5 +879,9 @@ async getPackageTrainerId(
  return ptPackage.trainerId;
 
 }
-
+async checkActiveMembership(
+  customerId: string,
+): Promise<void> {
+  await this.getActiveMembership(customerId);
+}
 }

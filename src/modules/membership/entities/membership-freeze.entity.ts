@@ -16,7 +16,12 @@ export class MembershipFreeze {
   id: number;
 
 
-  @ManyToOne(() => Membership)
+  @ManyToOne(
+    () => Membership,
+    {
+      onDelete: 'CASCADE'
+    }
+  )
   @JoinColumn({ name: 'membership_id' })
   membership: Membership;
 

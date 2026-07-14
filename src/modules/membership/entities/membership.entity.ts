@@ -6,9 +6,12 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    OneToMany,
 } from 'typeorm';
 import { MembershipPlan } from './membership-plan.entity';
 import { MembershipStatus } from '../enum/membership-status.enum';
+import { CustomerBenefit } from './customer-benefit.entity';
+import { MembershipFreeze } from './membership-freeze.entity';
 
 
 @Entity('memberships')
@@ -55,4 +58,16 @@ export class Membership {
 
     @UpdateDateColumn()
     updatedAt: Date;
+    @OneToMany(
+        () => CustomerBenefit,
+        benefit => benefit.membership
+    )
+    benefits: CustomerBenefit[];
+
+
+    @OneToMany(
+        () => MembershipFreeze,
+        freeze => freeze.membership
+    )
+    freezes: MembershipFreeze[];
 }
