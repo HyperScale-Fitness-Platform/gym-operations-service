@@ -4,7 +4,10 @@
   "scripts": {
     "build": "nest build",
     "start": "nest start",
-    "start:dev": "nest start --watch"
+    "start:dev": "nest start --watch",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -24,6 +27,7 @@
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "ts-node": "^10.9.0",
+    "typeorm-ts-node-commonjs": "^0.3.20",
     "typescript": "^5.1.0"
   }
 }
