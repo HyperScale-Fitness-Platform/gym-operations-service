@@ -5,22 +5,39 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
-@Entity('occupancy')
+
+@Entity('occupancies')
 export class Occupancy {
+
+
   @PrimaryGeneratedColumn()
-  id: number;
+  id:number;
 
-  @Column()
-  customerId: string;
-
-  @Column()
-  checkIn: Date;
 
   @Column({
-    nullable: true,
+    name:'customer_id'
   })
-  checkOut: Date;
+  customerId:string;
 
-  @CreateDateColumn()
-  createdAt: Date;
+
+  @Column({
+    name:'check_in',
+    type:'timestamp'
+  })
+  checkIn:Date;
+
+
+  @Column({
+    name:'check_out',
+    type:'timestamp',
+    nullable:true,
+  })
+  checkOut:Date | null;
+
+
+  @CreateDateColumn({
+    name:'created_at'
+  })
+  createdAt:Date;
+
 }
