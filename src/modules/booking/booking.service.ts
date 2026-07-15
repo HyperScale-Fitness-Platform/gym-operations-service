@@ -57,6 +57,7 @@ export class BookingService {
   }
 
   private async createClassBooking(dto: CreateBookingDto) {
+    await this.membershipService.checkActiveMembership(dto.customerId);
     const session = await this.sessionRepo.findOne({
       where: { id: dto.classSessionId },
       relations: ['class', 'bookings'],
