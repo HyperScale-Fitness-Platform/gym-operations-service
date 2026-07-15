@@ -8,6 +8,7 @@ export class InitialSchema1784042855965 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_ae9259c5b9f8d98ca8a00904b4" ON "trainer_slots" ("trainer_id") `);
         await queryRunner.query(`CREATE INDEX "IDX_20ed9b32fb141df5821774d93b" ON "trainer_slots" ("status") `);
         await queryRunner.query(`CREATE TABLE "bookings" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "customer_id" character varying NOT NULL, "class_session_id" uuid, "trainer_slot_id" uuid, "type" character varying NOT NULL, "status" character varying NOT NULL DEFAULT 'confirmed', "sessionSource" character varying NOT NULL DEFAULT 'membership', "pt_package_id" uuid, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_bee6805982cc1e248e94ce94957" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "unique_active_trainer_slot_booking" ON "bookings" ("trainer_slot_id") WHERE "status" = 'confirmed' AND "trainer_slot_id" IS NOT NULL`);
         await queryRunner.query(`CREATE INDEX "IDX_8e21b7ae33e7b0673270de4146" ON "bookings" ("customer_id") `);
         await queryRunner.query(`CREATE TABLE "class_sessions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "class_id" uuid NOT NULL, "trainer_id" character varying NOT NULL, "start_time" TIMESTAMP WITH TIME ZONE NOT NULL, "end_time" TIMESTAMP WITH TIME ZONE NOT NULL, CONSTRAINT "PK_dc034da48c6e0cf95c51f606c4e" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "classes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "type" character varying NOT NULL, "capacity" integer NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_e207aa15404e9b2ce35910f9f7f" PRIMARY KEY ("id"))`);
@@ -53,6 +54,7 @@ export class InitialSchema1784042855965 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "classes"`);
         await queryRunner.query(`DROP TABLE "class_sessions"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_8e21b7ae33e7b0673270de4146"`);
+        await queryRunner.query(`DROP INDEX "public"."unique_active_trainer_slot_booking"`);
         await queryRunner.query(`DROP TABLE "bookings"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_20ed9b32fb141df5821774d93b"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_ae9259c5b9f8d98ca8a00904b4"`);
