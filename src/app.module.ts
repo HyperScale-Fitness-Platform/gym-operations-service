@@ -5,9 +5,11 @@ import { MembershipModule } from './modules/membership/membership.module';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { OccupancyModule } from './modules/occupancy/occupancy.module';
+import { RedisConfigModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
+    RedisConfigModule,
     ConfigModule.forRoot(),
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
