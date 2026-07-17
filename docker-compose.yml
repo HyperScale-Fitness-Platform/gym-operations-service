@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+
+  gym-operations-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gym-operations-service
+    container_name: gym-operations-service-cont
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    env_file:
+      - .env
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - gym-network
+
+
+  migration:
+    image: gym-operations-service
+    command: npm run migration:run
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gym-network
+
+
+  postgres:
+    image: postgres:16
+    container_name: gym-operations-postgres-cont
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gym-network
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: gym-redis-cont
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gym-network
+
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
+networks:
+  gym-network:
+    driver: bridge

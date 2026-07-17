@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gym-operations-migration
+  namespace: gym-dev
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migration
+        image: alaaatef20/gym-operations-service:latest
+        command:
+          - npm
+          - run
+          - migration:run
+        envFrom:
+          - configMapRef:
+              name: gym-operations-config
+        env:
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gym-operations-secret
+                key: DB_PASSWORD

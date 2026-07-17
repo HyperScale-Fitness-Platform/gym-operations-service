@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: gym-dev
+data:
+  POSTGRES_DB: gym_operations_db
+  POSTGRES_USER: postgres
