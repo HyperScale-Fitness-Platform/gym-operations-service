@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: gym-operations-service
     container_name: gym-operations-service-cont
     restart: unless-stopped
     ports:
@@ -22,7 +23,7 @@ services:
 
 
   migration:
-    build: .
+    image: gym-operations-service
     command: npm run migration:run
     env_file:
       - .env
