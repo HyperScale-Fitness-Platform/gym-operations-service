@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gym-operations-service
+  namespace: gym-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gym-operations-service
+  template:
+    metadata:
+      labels:
+        app: gym-operations-service
+    spec:
+      containers:
+      - name: gym-operations-service
+        image: alaaatef20/gym-operations-service:latest
+        ports:
+        - containerPort: 3004
+        envFrom:
+        - configMapRef:
+            name: gym-operations-config
+
+        - secretRef:
+            name: gym-operations-secret
