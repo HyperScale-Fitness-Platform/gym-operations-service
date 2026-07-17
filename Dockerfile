@@ -31,6 +31,7 @@ COPY --from=builder /app/dist ./dist
 # container if you ever run `npm run migration:run` against it directly
 COPY --from=builder /app/src/data-source.ts ./src/data-source.ts
 COPY --from=builder /app/src/migrations ./src/migrations
+COPY --from=builder /app/src/modules ./src/modules
 COPY tsconfig.json ./
 
 EXPOSE 3004
