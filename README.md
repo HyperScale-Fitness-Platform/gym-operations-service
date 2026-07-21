@@ -94,8 +94,21 @@ docker run -d --name gym-redis -p 6379:6379 redis
 
 # 5. Create the database
 # (in pgAdmin or psql)
+
 CREATE DATABASE gym_operations_db;
 
+# (in container)
+
+```bash
+docker run -d \
+  --name gym-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=123456 \
+  -e POSTGRES_DB=gym_operations_db \
+  -p 5432:5432 \
+  postgres:16
+
+```
 # 6. Run migrations — creates all tables (do this BEFORE starting the app)
 npm run migration:run
 
