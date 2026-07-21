@@ -22,14 +22,30 @@ export class BookingService {
     private dataSource: DataSource,
     private membershipService: MembershipService,
     private events: EventPublisher,
-  ) {}
+  ) { }
 
   async getClasses() {
     return this.classRepo.find();
   }
 
   async getClassSessions(classId: string) {
-    return this.sessionRepo.find({ where: { classId } });
+    const sessions = await this.sessionRepo.find({
+      where: { classId },
+      relations: ['class', 'bookings'],
+    });
+
+    return sessions.map((session) => {
+      const confirmedCount = session.bookings.filter((b) => b.status === 'confirmed').length;
+      return {
+        id: session.id,
+        classId: session.classId,
+        trainerId: session.trainerId,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        capacity: session.class.capacity,
+        spotsRemaining: session.class.capacity - confirmedCount,
+      };
+    });
   }
 
   async getTrainerSlots(trainerId: string) {
@@ -46,7 +62,7 @@ export class BookingService {
   async getCustomerBookings(customerId: string) {
     return this.bookingRepo.find({
       where: { customerId },
-      relations: ['classSession', 'trainerSlot'],
+      relations: ['classSession', 'classSession.class', 'trainerSlot'],
       order: { createdAt: 'DESC' },
     });
   }
