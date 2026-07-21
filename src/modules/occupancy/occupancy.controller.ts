@@ -1,27 +1,27 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Headers } from '@nestjs/common';
 
 import { OccupancyService } from './occupancy.service';
 import { CheckInDto } from './dto/checkin.dto';
 import { CheckOutDto } from './dto/checkout.dto';
 
-@Controller()
+@Controller('operations')
 export class OccupancyController {
   constructor(
     private readonly occupancyService: OccupancyService,
-  ) {}
+  ) { }
 
   @Post('checkin')
   checkIn(
-    @Body() dto: CheckInDto,
+    @Headers('user-id') customerId: string,
   ) {
-    return this.occupancyService.checkIn(dto);
+    return this.occupancyService.checkIn(customerId);
   }
 
   @Post('checkout')
   checkOut(
-    @Body() dto: CheckOutDto,
+    @Headers('user-id') customerId: string,
   ) {
-    return this.occupancyService.checkOut(dto);
+    return this.occupancyService.checkOut(customerId);
   }
 
   @Get('current')
