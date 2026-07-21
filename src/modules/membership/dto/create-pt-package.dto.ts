@@ -8,10 +8,6 @@ export class CreatePtPackageDto {
 
 
  @IsUUID()
- customerId:string;
-
-
- @IsUUID()
  trainerId:string;
 
 
