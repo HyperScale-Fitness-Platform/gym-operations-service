@@ -103,7 +103,7 @@ CREATE DATABASE gym_operations_db;
 docker run -d \
   --name gym-postgres \
   -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=123456 \
+  -e POSTGRES_PASSWORD=your_password_here \
   -e POSTGRES_DB=gym_operations_db \
   -p 5432:5432 \
   postgres:16
