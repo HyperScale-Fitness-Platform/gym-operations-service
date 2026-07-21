@@ -36,7 +36,7 @@ export class BookingService {
     return this.slotRepo.find({ where: { trainerId, status: 'open' } });
   }
 
-  // NEW — for customers using a paid PT package, slots are restricted to
+  // for customers using a paid PT package, slots are restricted to
   // only the trainer that package is locked to
   async getSlotsForPackage(packageId: string) {
     const trainerId = await this.membershipService.getPackageTrainerId(packageId);
@@ -51,13 +51,14 @@ export class BookingService {
     });
   }
 
-  async createBooking(dto: CreateBookingDto) {
-    if (dto.type === 'class') return this.createClassBooking(dto);
-    return this.createPtSessionBooking(dto);
+  async createBooking(customerId: string, dto: CreateBookingDto) {
+    if (dto.type === 'class') return this.createClassBooking(customerId, dto);
+    return this.createPtSessionBooking(customerId, dto);
   }
 
-  private async createClassBooking(dto: CreateBookingDto) {
-    await this.membershipService.checkActiveMembership(dto.customerId);
+  private async createClassBooking(customerId: string, dto: CreateBookingDto) {
+    await this.membershipService.checkActiveMembership(customerId);
+
     const session = await this.sessionRepo.findOne({
       where: { id: dto.classSessionId },
       relations: ['class', 'bookings'],
@@ -71,7 +72,7 @@ export class BookingService {
 
     const booking = await this.bookingRepo.save(
       this.bookingRepo.create({
-        customerId: dto.customerId,
+        customerId,
         classSessionId: dto.classSessionId,
         type: 'class',
         status: 'confirmed',
@@ -87,7 +88,7 @@ export class BookingService {
     return booking;
   }
 
-  private async createPtSessionBooking(dto: CreateBookingDto) {
+  private async createPtSessionBooking(customerId: string, dto: CreateBookingDto) {
     const slot = await this.slotRepo.findOne({ where: { id: dto.trainerSlotId } });
     if (!slot || slot.status !== 'open') {
       throw new ConflictException('This trainer slot is no longer available');
@@ -96,7 +97,7 @@ export class BookingService {
     // sessionSource is required by the DTO whenever type = 'pt_session',
     // so by this point it's guaranteed to be either 'membership' or 'package'
     if (dto.sessionSource === 'membership') {
-      const hasCredit = await this.membershipService.checkPtSessionsAvailable(dto.customerId);
+      const hasCredit = await this.membershipService.checkPtSessionsAvailable(customerId);
       if (!hasCredit) {
         throw new BadRequestException('No free PT sessions remaining on membership');
       }
@@ -118,7 +119,7 @@ export class BookingService {
       await manager.update(TrainerSlot, dto.trainerSlotId, { status: 'booked' });
       return manager.save(
         manager.create(Booking, {
-          customerId: dto.customerId,
+          customerId,
           trainerSlotId: dto.trainerSlotId,
           type: 'pt_session',
           status: 'confirmed',
@@ -129,7 +130,7 @@ export class BookingService {
     });
 
     if (dto.sessionSource === 'membership') {
-      await this.membershipService.deductPtSession(dto.customerId);
+      await this.membershipService.deductPtSession(customerId);
     } else {
       await this.membershipService.deductPackageSession(dto.ptPackageId!);
     }

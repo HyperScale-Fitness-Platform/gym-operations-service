@@ -6,7 +6,7 @@ import { CreatePlanDto } from './dto/create-plan.dto';
 import { CreateBenefitDto } from './dto/create-benefit.dto';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
 
-@Controller('operations')
+@Controller()
 export class MembershipController {
     constructor(
         private readonly membershipService: MembershipService,

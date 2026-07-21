@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Headers } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateClassDto } from './dto/create-class.dto';
@@ -25,7 +25,7 @@ export class BookingController {
     return this.bookingService.getTrainerSlots(trainerId);
   }
 
-  // NEW — slots filtered to the trainer this PT package is locked to
+  // slots filtered to the trainer this PT package is locked to
   @Get('pt-packages/:packageId/available-slots')
   getSlotsForPackage(@Param('packageId') packageId: string) {
     return this.bookingService.getSlotsForPackage(packageId);
@@ -37,8 +37,11 @@ export class BookingController {
   }
 
   @Post('bookings')
-  createBooking(@Body() dto: CreateBookingDto) {
-    return this.bookingService.createBooking(dto);
+  createBooking(
+    @Body() dto: CreateBookingDto,
+    @Headers('user-id') customerId: string,
+  ) {
+    return this.bookingService.createBooking(customerId, dto);
   }
 
   @Delete('bookings/:id')
