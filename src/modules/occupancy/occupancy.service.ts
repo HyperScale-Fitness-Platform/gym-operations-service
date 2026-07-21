@@ -66,10 +66,10 @@ export class OccupancyService implements OnModuleInit {
 
 
 
-  async checkIn(dto: CheckInDto) {
+  async checkIn(customerId:string) {
     const membership =
       await this.membershipService.getCustomerMembership(
-        dto.customerId,
+        customerId,
       );
 
     if (!membership || membership.status !== 'ACTIVE') {
@@ -81,7 +81,7 @@ export class OccupancyService implements OnModuleInit {
     const existing =
       await this.occupancyRepository.findOne({
         where: {
-          customerId: dto.customerId,
+          customerId: customerId,
           checkOut: IsNull(),
         },
       });
@@ -94,7 +94,7 @@ export class OccupancyService implements OnModuleInit {
 
     const occupancy =
       this.occupancyRepository.create({
-        customerId: dto.customerId,
+        customerId: customerId,
         checkIn: new Date(),
       });
 
@@ -105,7 +105,7 @@ export class OccupancyService implements OnModuleInit {
 
       await this.redis.sadd(
         this.OCCUPANCY_KEY,
-        dto.customerId,
+        customerId,
       );
 
     } catch (error) {
@@ -120,11 +120,11 @@ export class OccupancyService implements OnModuleInit {
     return savedOccupancy;
   }
 
-  async checkOut(dto: CheckOutDto) {
+  async checkOut(customerId:string) {
     const occupancy =
       await this.occupancyRepository.findOne({
         where: {
-          customerId: dto.customerId,
+          customerId: customerId,
           checkOut: IsNull(),
         },
       });
@@ -144,7 +144,7 @@ export class OccupancyService implements OnModuleInit {
 
       await this.redis.srem(
         this.OCCUPANCY_KEY,
-        dto.customerId,
+        customerId,
       );
 
     } catch (error) {
