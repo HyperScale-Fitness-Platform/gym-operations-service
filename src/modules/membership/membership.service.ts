@@ -49,119 +49,119 @@ export class MembershipService {
     private readonly membershipBenefitRepository: Repository<MembershipBenefit>,
     @InjectRepository(PtPackage)
     private readonly ptPackageRepository:
-    Repository<PtPackage>,
+      Repository<PtPackage>,
   ) { }
 
 
   async createPlan(
-  dto: CreatePlanDto,
-) {
+    dto: CreatePlanDto,
+  ) {
 
-  const existingPlan =
-    await this.membershipPlanRepository.findOne({
-      where:{
-        name:dto.name,
-      },
-    });
+    const existingPlan =
+      await this.membershipPlanRepository.findOne({
+        where: {
+          name: dto.name,
+        },
+      });
 
 
-  if(existingPlan){
-    throw new ConflictException(
-      'Plan already exists',
-    );
+    if (existingPlan) {
+      throw new ConflictException(
+        'Plan already exists',
+      );
+    }
+
+
+    const plan =
+      this.membershipPlanRepository.create({
+
+        name: dto.name,
+
+        price: dto.price,
+
+        durationInDays: dto.durationInDays,
+
+        maxFreezes: dto.maxFreezes,
+
+        isActive: true,
+
+      });
+
+
+    return this.membershipPlanRepository.save(plan);
+
   }
 
+  async getPlanById(
+    id: number,
+  ) {
 
-  const plan =
-    this.membershipPlanRepository.create({
+    const plan =
+      await this.membershipPlanRepository.findOne({
 
-      name:dto.name,
+        where: {
+          id,
+        },
 
-      price:dto.price,
+        relations: {
+          benefits: true,
+        },
 
-      durationInDays:dto.durationInDays,
-
-      maxFreezes:dto.maxFreezes,
-
-      isActive:true,
-
-    });
-
-
-  return this.membershipPlanRepository.save(plan);
-
-}
-
-async getPlanById(
-  id:number,
-){
-
-  const plan =
-    await this.membershipPlanRepository.findOne({
-
-      where:{
-        id,
-      },
-
-      relations:{
-        benefits:true,
-      },
-
-    });
+      });
 
 
-  if(!plan){
-    throw new NotFoundException(
-      'Plan not found',
-    );
+    if (!plan) {
+      throw new NotFoundException(
+        'Plan not found',
+      );
+    }
+
+
+    return plan;
+
   }
+  async addBenefit(
+    planId: number,
+    dto: CreateBenefitDto,
+  ) {
+
+    const plan =
+      await this.membershipPlanRepository.findOne({
+
+        where: {
+          id: planId,
+        },
+
+      });
 
 
-  return plan;
-
-}
-async addBenefit(
-  planId:number,
-  dto:CreateBenefitDto,
-){
-
-  const plan =
-    await this.membershipPlanRepository.findOne({
-
-      where:{
-        id:planId,
-      },
-
-    });
+    if (!plan) {
+      throw new NotFoundException(
+        'Plan not found',
+      );
+    }
 
 
-  if(!plan){
-    throw new NotFoundException(
-      'Plan not found',
+
+    const benefit =
+      this.membershipBenefitRepository.create({
+
+        plan,
+
+        benefitName:
+          dto.benefitName,
+
+        benefitValue:
+          dto.benefitValue,
+
+      });
+
+
+    return this.membershipBenefitRepository.save(
+      benefit,
     );
+
   }
-
-
-
-  const benefit =
-    this.membershipBenefitRepository.create({
-
-      plan,
-
-      benefitName:
-        dto.benefitName,
-
-      benefitValue:
-        dto.benefitValue,
-
-    });
-
-
-  return this.membershipBenefitRepository.save(
-    benefit,
-  );
-
-}
 
   async findAllPlans() {
     return this.membershipPlanRepository.find({
@@ -173,11 +173,10 @@ async addBenefit(
       },
     });
   }
-  async subscribe(dto: SubscribeMembershipDto) {
-    const {
-      customerId,
-      planId,
-    } = dto;
+  async subscribe(
+    customerId: string,
+    planId: number
+  ) {
 
     const plan =
       await this.membershipPlanRepository.findOne({
@@ -259,6 +258,26 @@ async addBenefit(
     return savedMembership;
   }
 
+  // async getCustomerMembership(customerId: string) {
+
+  //   const membership =
+  //     await this.membershipRepository.findOne({
+  //       where: {
+  //         customerId,
+  //       },
+  //       relations: {
+  //         plan: true,
+  //       },
+  //     });
+
+
+  //   if (!membership) {
+  //     throw new NotFoundException('Membership not found');
+  //   }
+
+  //   return membership;
+  // }
+
   async getCustomerMembership(customerId: string) {
 
     const membership =
@@ -267,16 +286,14 @@ async addBenefit(
           customerId,
         },
         relations: {
-          plan: true,
+          plan: {
+                    benefits: true,
+                },
         },
       });
 
 
-    if (!membership) {
-      throw new NotFoundException('Membership not found');
-    }
-
-    return membership;
+    return membership ?? null;
   }
 
   async freezeMembership(
@@ -603,285 +620,285 @@ async addBenefit(
   }
 
   async refundPtSession(
-  customerId: string,
-): Promise<void> {
+    customerId: string,
+  ): Promise<void> {
 
-  const membership =
-    await this.getActiveMembership(customerId);
+    const membership =
+      await this.getActiveMembership(customerId);
 
-  const benefit =
-    await this.getPtBenefit(membership.id);
+    const benefit =
+      await this.getPtBenefit(membership.id);
 
-  if (
-    benefit.remainingValue <
-    benefit.totalValue
-  ) {
-    benefit.remainingValue++;
+    if (
+      benefit.remainingValue <
+      benefit.totalValue
+    ) {
+      benefit.remainingValue++;
+    }
+
+    await this.customerBenefitRepository.save(
+      benefit,
+    );
   }
 
-  await this.customerBenefitRepository.save(
-    benefit,
-  );
-}
+
+  async purchasePackage(
+    dto: CreatePtPackageDto & { customerId: string }
+  ) {
+
+    let sessionsTotal: number;
 
 
-async purchasePackage(
- dto:CreatePtPackageDto
-){
+    switch (dto.packageType) {
 
- let sessionsTotal:number;
-
-
- switch(dto.packageType){
-
-  case '20':
-    sessionsTotal=20;
-    break;
+      case '20':
+        sessionsTotal = 20;
+        break;
 
 
-  case '40':
-    sessionsTotal=40;
-    break;
+      case '40':
+        sessionsTotal = 40;
+        break;
 
 
-  case '60':
-    sessionsTotal=60;
-    break;
+      case '60':
+        sessionsTotal = 60;
+        break;
 
 
-  default:
-    throw new BadRequestException(
-      'Invalid package type'
+      default:
+        throw new BadRequestException(
+          'Invalid package type'
+        );
+
+    }
+
+
+    const packageEntity =
+      this.ptPackageRepository.create({
+
+        customerId: dto.customerId,
+
+        trainerId: dto.trainerId,
+
+        packageType: dto.packageType,
+
+        sessionsTotal,
+
+        sessionsUsed: 0,
+
+        status:
+          PtPackageStatus.PENDING_PAYMENT,
+
+      });
+
+
+    return this.ptPackageRepository.save(
+      packageEntity
     );
 
- }
+  }
 
 
- const packageEntity =
- this.ptPackageRepository.create({
+  async getPackageTypes() {
 
-   customerId:dto.customerId,
+    return [
+      {
+        type: '20',
+        sessions: 20,
+      },
+      {
+        type: '40',
+        sessions: 40,
+      },
+      {
+        type: '60',
+        sessions: 60,
+      },
+    ];
 
-   trainerId:dto.trainerId,
+  }
+  async getCustomerPackages(
+    customerId: string,
+  ) {
 
-   packageType:dto.packageType,
+    return this.ptPackageRepository.find({
 
-   sessionsTotal,
+      where: {
+        customerId,
+      },
 
-   sessionsUsed:0,
+      order: {
+        purchasedAt: 'DESC',
+      },
 
-   status:
-   PtPackageStatus.PENDING_PAYMENT,
+    });
 
- });
+  }
 
+  private async getActivePackage(
+    packageId: string,
+  ): Promise<PtPackage> {
 
- return this.ptPackageRepository.save(
-   packageEntity
- );
 
-}
+    const ptPackage =
+      await this.ptPackageRepository.findOne({
 
+        where: {
+          id: packageId,
+          status: PtPackageStatus.ACTIVE,
+        },
 
-async getPackageTypes() {
+      });
 
-  return [
-    {
-      type: '20',
-      sessions: 20,
-    },
-    {
-      type: '40',
-      sessions: 40,
-    },
-    {
-      type: '60',
-      sessions: 60,
-    },
-  ];
 
-}
-async getCustomerPackages(
-  customerId:string,
-){
+    if (!ptPackage) {
 
-  return this.ptPackageRepository.find({
+      throw new NotFoundException(
+        'Active package not found',
+      );
 
-    where:{
-      customerId,
-    },
+    }
 
-    order:{
-      purchasedAt:'DESC',
-    },
 
-  });
+    return ptPackage;
 
-}
+  }
 
-private async getActivePackage(
-  packageId:string,
-):Promise<PtPackage>{
+  async checkPackageSessionsAvailable(
+    packageId: string,
+  ): Promise<boolean> {
 
 
- const ptPackage =
- await this.ptPackageRepository.findOne({
+    const ptPackage =
+      await this.getActivePackage(packageId);
 
-   where:{
-     id:packageId,
-     status:PtPackageStatus.ACTIVE,
-   },
 
- });
+    return (
+      ptPackage.sessionsUsed <
+      ptPackage.sessionsTotal
+    );
 
+  }
+  async deductPackageSession(
+    packageId: string,
+  ): Promise<void> {
 
- if(!ptPackage){
 
-   throw new NotFoundException(
-     'Active package not found',
-   );
+    const ptPackage =
+      await this.getActivePackage(packageId);
 
- }
 
+    if (
+      ptPackage.sessionsUsed >=
+      ptPackage.sessionsTotal
+    ) {
 
- return ptPackage;
+      throw new BadRequestException(
+        'No package sessions remaining',
+      );
 
-}
+    }
 
-async checkPackageSessionsAvailable(
- packageId:string,
-):Promise<boolean>{
 
+    ptPackage.sessionsUsed++;
 
- const ptPackage =
- await this.getActivePackage(packageId);
 
+    if (
+      ptPackage.sessionsUsed ===
+      ptPackage.sessionsTotal
+    ) {
 
- return (
-   ptPackage.sessionsUsed <
-   ptPackage.sessionsTotal
- );
+      ptPackage.status =
+        PtPackageStatus.EXHAUSTED;
 
-}
-async deductPackageSession(
- packageId:string,
-):Promise<void>{
+    }
 
 
- const ptPackage =
- await this.getActivePackage(packageId);
+    await this.ptPackageRepository.save(
+      ptPackage,
+    );
 
+  }
+  async refundPackageSession(
+    packageId: string,
+  ): Promise<void> {
 
- if(
-   ptPackage.sessionsUsed >=
-   ptPackage.sessionsTotal
- ){
 
-   throw new BadRequestException(
-    'No package sessions remaining',
-   );
+    const ptPackage =
+      await this.ptPackageRepository.findOne({
 
- }
+        where: {
+          id: packageId,
+        },
 
+      });
 
- ptPackage.sessionsUsed++;
 
+    if (!ptPackage) {
 
- if(
-   ptPackage.sessionsUsed ===
-   ptPackage.sessionsTotal
- ){
+      throw new NotFoundException(
+        'Package not found',
+      );
 
-   ptPackage.status =
-    PtPackageStatus.EXHAUSTED;
+    }
 
- }
 
+    if (
+      ptPackage.sessionsUsed > 0
+    ) {
 
- await this.ptPackageRepository.save(
-   ptPackage,
- );
+      ptPackage.sessionsUsed--;
 
-}
-async refundPackageSession(
- packageId:string,
-):Promise<void>{
+    }
 
 
- const ptPackage =
- await this.ptPackageRepository.findOne({
+    if (
+      ptPackage.status ===
+      PtPackageStatus.EXHAUSTED
+    ) {
 
-   where:{
-     id:packageId,
-   },
+      ptPackage.status =
+        PtPackageStatus.ACTIVE;
 
- });
+    }
 
 
- if(!ptPackage){
+    await this.ptPackageRepository.save(
+      ptPackage,
+    );
 
-   throw new NotFoundException(
-     'Package not found',
-   );
+  }
+  async getPackageTrainerId(
+    packageId: string,
+  ): Promise<string> {
 
- }
 
+    const ptPackage =
+      await this.ptPackageRepository.findOne({
 
- if(
-   ptPackage.sessionsUsed > 0
- ){
+        where: {
+          id: packageId,
+        },
 
-   ptPackage.sessionsUsed--;
+      });
 
- }
 
+    if (!ptPackage) {
 
- if(
-   ptPackage.status ===
-   PtPackageStatus.EXHAUSTED
- ){
+      throw new NotFoundException(
+        'Package not found',
+      );
 
-   ptPackage.status =
-    PtPackageStatus.ACTIVE;
+    }
 
- }
 
+    return ptPackage.trainerId;
 
- await this.ptPackageRepository.save(
-   ptPackage,
- );
-
-}
-async getPackageTrainerId(
- packageId:string,
-):Promise<string>{
-
-
- const ptPackage =
- await this.ptPackageRepository.findOne({
-
-   where:{
-     id:packageId,
-   },
-
- });
-
-
- if(!ptPackage){
-
-   throw new NotFoundException(
-    'Package not found',
-   );
-
- }
-
-
- return ptPackage.trainerId;
-
-}
-async checkActiveMembership(
-  customerId: string,
-): Promise<void> {
-  await this.getActiveMembership(customerId);
-}
+  }
+  async checkActiveMembership(
+    customerId: string,
+  ): Promise<void> {
+    await this.getActiveMembership(customerId);
+  }
 }
