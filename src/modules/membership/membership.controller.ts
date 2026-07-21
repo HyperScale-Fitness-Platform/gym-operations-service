@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Headers } from '@nestjs/common';
 import { MembershipService } from './membership.service';
 import { FreezeMembershipDto } from './dto/freeze-membership.dto';
 import { SubscribeMembershipDto } from './dto/subscribe-membership.dto';
@@ -6,7 +6,7 @@ import { CreatePlanDto } from './dto/create-plan.dto';
 import { CreateBenefitDto } from './dto/create-benefit.dto';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
 
-@Controller()
+@Controller('operations')
 export class MembershipController {
     constructor(
         private readonly membershipService: MembershipService,
@@ -42,13 +42,19 @@ export class MembershipController {
     @Post('memberships/subscribe')
     subscribe(
         @Body() dto: SubscribeMembershipDto,
+        @Headers('user-id') customerId: string,
     ) {
-        return this.membershipService.subscribe(dto);
+
+        return this.membershipService.subscribe(
+            customerId,
+            dto.planId
+        );
+
     }
 
-    @Get('customers/:id/membership')
+    @Get('membership/current')
     getCustomerMembership(
-        @Param('id') customerId: string,
+        @Headers('user-id') customerId: string
     ) {
         return this.membershipService.getCustomerMembership(customerId);
     }
@@ -70,26 +76,27 @@ export class MembershipController {
         return this.membershipService.unfreezeMembership(membershipId);
     }
 
-@Post('pt-packages/purchase')
-purchasePackage(
- @Body() dto:CreatePtPackageDto
-){
+    @Post('pt-packages/purchase')
+    purchasePackage(
+        @Body() dto: CreatePtPackageDto,
+        @Headers('user-id') customerId:string,
+    ) {
 
- return this.membershipService.purchasePackage(dto);
+        return this.membershipService.purchasePackage({...dto, customerId});
 
-}
+    }
 
-@Get('pt-packages/types')
-getPackageTypes() {
-  return this.membershipService.getPackageTypes();
-}
+    @Get('pt-packages/types')
+    getPackageTypes() {
+        return this.membershipService.getPackageTypes();
+    }
 
-@Get('customers/:id/pt-packages')
-getCustomerPackages(
-  @Param('id') customerId:string,
-){
+    @Get('customers/:id/pt-packages')
+    getCustomerPackages(
+        @Param('id') customerId: string,
+    ) {
 
-  return this.membershipService.getCustomerPackages(customerId);
+        return this.membershipService.getCustomerPackages(customerId);
 
-}
+    }
 }
