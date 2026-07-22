@@ -23,6 +23,12 @@ export class MembershipController {
     findAllPlans() {
         return this.membershipService.findAllPlans();
     }
+    @Get('admin/plans')
+    findAllPlansAdmin() {
+
+        return this.membershipService.findAllPlansAdmin();
+
+    }
     @Get('plans/:id')
     getPlanById(
         @Param('id') id: number,
@@ -79,10 +85,10 @@ export class MembershipController {
     @Post('pt-packages/purchase')
     purchasePackage(
         @Body() dto: CreatePtPackageDto,
-        @Headers('user-id') customerId:string,
+        @Headers('user-id') customerId: string,
     ) {
 
-        return this.membershipService.purchasePackage({...dto, customerId});
+        return this.membershipService.purchasePackage({ ...dto, customerId });
 
     }
 
