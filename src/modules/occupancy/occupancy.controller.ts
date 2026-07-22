@@ -4,7 +4,7 @@ import { OccupancyService } from './occupancy.service';
 import { CheckInDto } from './dto/checkin.dto';
 import { CheckOutDto } from './dto/checkout.dto';
 
-@Controller('operations')
+@Controller()
 export class OccupancyController {
   constructor(
     private readonly occupancyService: OccupancyService,
