@@ -173,6 +173,23 @@ export class MembershipService {
       },
     });
   }
+
+  async findAllPlansAdmin() {
+
+    return this.membershipPlanRepository.find({
+      where: {
+        isActive: true,
+      },
+      relations: {
+        benefits: true,
+      },
+      order: {
+        price: 'ASC',
+      },
+    });
+
+  }
+
   async subscribe(
     customerId: string,
     planId: number
@@ -287,8 +304,8 @@ export class MembershipService {
         },
         relations: {
           plan: {
-                    benefits: true,
-                },
+            benefits: true,
+          },
         },
       });
 
