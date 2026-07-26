@@ -11,6 +11,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateClassDto } from './dto/create-class.dto';
 import { CreateClassSessionDto } from './dto/create-class-session.dto';
 import { CreateTrainerSlotDto } from './dto/create-trainer-slot.dto';
+import { UpdateClassDto } from './dto/update-class.dto';
 
 @Injectable()
 export class BookingService {
@@ -276,4 +277,12 @@ export class BookingService {
 
     return newBooking;
   }
+
+  async updateClass(classId: string, dto: UpdateClassDto) {
+  const existing = await this.classRepo.findOne({ where: { id: classId } });
+  if (!existing) throw new BadRequestException('Class not found');
+
+  await this.classRepo.update(classId, dto);
+  return this.classRepo.findOne({ where: { id: classId } });
+}
 }

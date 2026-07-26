@@ -5,10 +5,11 @@ import { CreateClassDto } from './dto/create-class.dto';
 import { CreateClassSessionDto } from './dto/create-class-session.dto';
 import { CreateTrainerSlotDto } from './dto/create-trainer-slot.dto';
 import { RescheduleBookingDto } from './dto/reschedule-booking.dto';
+import { UpdateClassDto } from './dto/update-class.dto';
 
 @Controller()
 export class BookingController {
-  constructor(private bookingService: BookingService) {}
+  constructor(private bookingService: BookingService) { }
 
   @Get('classes')
   getClasses() {
@@ -78,5 +79,10 @@ export class BookingController {
       dto.newClassSessionId,
       dto.newTrainerSlotId,
     );
+  }
+
+  @Patch('classes/:id')
+  updateClass(@Param('id') id: string, @Body() dto: UpdateClassDto) {
+    return this.bookingService.updateClass(id, dto);
   }
 }
