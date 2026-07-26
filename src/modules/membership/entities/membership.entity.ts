@@ -49,7 +49,7 @@ export class Membership {
     @Column({
         default: 0,
     })
-    freezesUsed: number;
+    freezeDaysUsed: number;
 
 
     @CreateDateColumn()

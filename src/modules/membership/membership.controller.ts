@@ -72,7 +72,8 @@ export class MembershipController {
     ) {
         return this.membershipService.freezeMembership(
             membershipId,
-            dto.days,
+            dto.startDate,
+            dto.endDate
         );
     }
     @Post('memberships/:id/unfreeze')
@@ -80,6 +81,17 @@ export class MembershipController {
         @Param('id') membershipId: number,
     ) {
         return this.membershipService.unfreezeMembership(membershipId);
+    }
+
+    @Post('memberships/:id/cancel-freeze/:freezeId')
+    cancelFreeze(
+        @Param('id') membershipId: number,
+        @Param('freezeId') freezeId: number
+    ) {
+        return this.membershipService.cancelFreeze(
+            membershipId,
+            freezeId
+        );
     }
 
     @Post('pt-packages/purchase')

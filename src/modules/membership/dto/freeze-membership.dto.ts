@@ -1,7 +1,10 @@
-import { IsInt, Min } from 'class-validator';
+import { IsDateString, IsInt, Min } from 'class-validator';
 
 export class FreezeMembershipDto {
-  @IsInt()
-  @Min(1)
-  days: number;
+ @IsDateString()
+ startDate: string;
+
+ @IsDateString()
+ endDate: string;
+
 }

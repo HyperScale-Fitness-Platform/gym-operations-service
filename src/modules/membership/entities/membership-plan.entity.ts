@@ -18,7 +18,7 @@ export class MembershipPlan {
   durationInDays: number;
 
   @Column()
-  maxFreezes: number;
+  freezeDays: number;
 
   @Column({
     default: true,

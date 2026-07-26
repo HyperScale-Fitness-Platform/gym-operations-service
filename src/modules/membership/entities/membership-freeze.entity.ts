@@ -25,6 +25,16 @@ export class MembershipFreeze {
   @JoinColumn({ name: 'membership_id' })
   membership: Membership;
 
+  @Column()
+  daysUsed: number;
+
+  @Column()
+  previousEndDate: Date;
+
+  @Column({
+    default: false
+  })
+  isCancelled: boolean;
 
   @Column()
   startDate: Date;

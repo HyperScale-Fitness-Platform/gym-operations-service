@@ -25,6 +25,6 @@ export class CreatePlanDto {
 
   @IsNumber()
   @IsPositive()
-  maxFreezes: number;
+  freezeDays: number;
 
 }

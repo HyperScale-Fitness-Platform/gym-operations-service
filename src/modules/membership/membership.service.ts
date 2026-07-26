@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { MembershipPlan } from './entities/membership-plan.entity';
 import { Membership } from './entities/membership.entity';
 import { MembershipFreeze } from './entities/membership-freeze.entity';
@@ -14,25 +14,6 @@ import { MembershipBenefit } from './entities/membership-benefit.entity';
 import { PtPackage } from './entities/pt-package.entity';
 import { PtPackageStatus } from './enum/pt-package-status.enum';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
-
-
-// STUB — your friend (Person 2) replaces the bodies of these functions
-// with real Prisma/TypeORM queries against the memberships and pt_packages
-// tables. Booking module calls these and only these — keep this the shared
-// contract, don't let Booking reach into Membership's other internals.
-//
-// Agreed signatures (do not change without telling Person 1 / Booking owner):
-//
-// -- Free membership-included PT sessions (any trainer) --
-//   checkPtSessionsAvailable(customerId: string): Promise<boolean>
-//   deductPtSession(customerId: string): Promise<void>
-//   refundPtSession(customerId: string): Promise<void>
-//
-// -- Paid PT packages (locked to one specific trainer) --
-//   checkPackageSessionsAvailable(packageId: string): Promise<boolean>
-//   deductPackageSession(packageId: string): Promise<void>
-//   refundPackageSession(packageId: string): Promise<void>
-//   getPackageTrainerId(packageId: string): Promise<string>
 
 @Injectable()
 export class MembershipService {
@@ -52,6 +33,61 @@ export class MembershipService {
       Repository<PtPackage>,
   ) { }
 
+  private normalizeDate(date: Date): Date {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+
+    return result;
+  }
+
+  private calculateFreezeDays(
+    startDate: Date,
+    endDate: Date,
+  ): number {
+
+    return (
+      Math.ceil(
+        (
+          this.normalizeDate(endDate).getTime() -
+          this.normalizeDate(startDate).getTime()
+        ) /
+        (1000 * 60 * 60 * 24)
+      ) + 1
+    );
+
+  }
+
+  private restoreFreezeDays(
+    membership: Membership,
+    days: number,
+  ): void {
+
+    membership.freezeDaysUsed -= days;
+
+    if (membership.freezeDaysUsed < 0) {
+      membership.freezeDaysUsed = 0;
+    }
+
+  }
+
+  private updateMembershipStatus(
+    membership: Membership,
+  ): void {
+
+    const today =
+      this.normalizeDate(new Date());
+
+    const endDate =
+      this.normalizeDate(
+        membership.endDate
+      );
+
+    membership.status =
+      endDate < today
+        ? MembershipStatus.EXPIRED
+        : MembershipStatus.ACTIVE;
+
+  }
 
   async createPlan(
     dto: CreatePlanDto,
@@ -64,13 +100,11 @@ export class MembershipService {
         },
       });
 
-
     if (existingPlan) {
       throw new ConflictException(
         'Plan already exists',
       );
     }
-
 
     const plan =
       this.membershipPlanRepository.create({
@@ -81,21 +115,18 @@ export class MembershipService {
 
         durationInDays: dto.durationInDays,
 
-        maxFreezes: dto.maxFreezes,
+        freezeDays: dto.freezeDays,
 
         isActive: true,
 
       });
 
-
     return this.membershipPlanRepository.save(plan);
-
   }
 
   async getPlanById(
     id: number,
   ) {
-
     const plan =
       await this.membershipPlanRepository.findOne({
 
@@ -109,22 +140,20 @@ export class MembershipService {
 
       });
 
-
     if (!plan) {
       throw new NotFoundException(
         'Plan not found',
       );
     }
 
-
     return plan;
 
   }
+
   async addBenefit(
     planId: number,
     dto: CreateBenefitDto,
   ) {
-
     const plan =
       await this.membershipPlanRepository.findOne({
 
@@ -134,14 +163,11 @@ export class MembershipService {
 
       });
 
-
     if (!plan) {
       throw new NotFoundException(
         'Plan not found',
       );
     }
-
-
 
     const benefit =
       this.membershipBenefitRepository.create({
@@ -155,7 +181,6 @@ export class MembershipService {
           dto.benefitValue,
 
       });
-
 
     return this.membershipBenefitRepository.save(
       benefit,
@@ -246,7 +271,7 @@ export class MembershipService {
         startDate,
         endDate,
         status: MembershipStatus.ACTIVE,
-        freezesUsed: 0,
+        freezeDaysUsed: 0,
       });
 
     const savedMembership =
@@ -275,26 +300,6 @@ export class MembershipService {
     return savedMembership;
   }
 
-  // async getCustomerMembership(customerId: string) {
-
-  //   const membership =
-  //     await this.membershipRepository.findOne({
-  //       where: {
-  //         customerId,
-  //       },
-  //       relations: {
-  //         plan: true,
-  //       },
-  //     });
-
-
-  //   if (!membership) {
-  //     throw new NotFoundException('Membership not found');
-  //   }
-
-  //   return membership;
-  // }
-
   async getCustomerMembership(customerId: string) {
 
     const membership =
@@ -306,16 +311,29 @@ export class MembershipService {
           plan: {
             benefits: true,
           },
+          freezes: true,
         },
       });
+    if (!membership) {
+      return null;
+    }
+    return {
+      ...membership,
 
+      freezeDaysAllowed:
+        membership.plan.freezeDays,
 
-    return membership ?? null;
+      freezeDaysUsed:
+        membership.freezeDaysUsed,
+
+      freezeDaysRemaining:
+        membership.plan.freezeDays -
+        membership.freezeDaysUsed,
+    };
   }
 
   async freezeMembership(
-    membershipId: number,
-    days: number,
+    membershipId: number, startDate: string, endDate: string,
   ) {
 
     const membership =
@@ -328,68 +346,101 @@ export class MembershipService {
         },
       });
 
-
     if (!membership) {
       throw new NotFoundException('Membership not found');
     }
-
 
     if (membership.status !== MembershipStatus.ACTIVE) {
       throw new NotFoundException('Membership is not active');
     }
 
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-    if (
-      membership.freezesUsed >= membership.plan.maxFreezes
-    ) {
-      throw new BadRequestException('Freeze limit reached');
+    const overlappingFreeze =
+      await this.membershipFreezeRepository.findOne({
+        where: {
+          membership: {
+            id: membershipId,
+          },
+          startDate: LessThanOrEqual(end),
+          endDate: MoreThanOrEqual(start),
+        },
+      });
+
+    if (overlappingFreeze) {
+      throw new BadRequestException(
+        'This freeze overlaps an existing freeze period',
+      );
     }
 
+    if (end < start) {
+      throw new BadRequestException(
+        'End date must be after start date',
+      );
+    }
 
-    const startDate = new Date();
+    const daysRequested =
+      this.calculateFreezeDays(
+        start,
+        end
+      );
 
+    const remainingDays =
+      membership.plan.freezeDays -
+      membership.freezeDaysUsed;
 
-    const endDate = new Date();
+    if (daysRequested > remainingDays) {
+      throw new BadRequestException('Not enough freeze days remaining');
+    }
 
-    endDate.setDate(
-      startDate.getDate() + days,
-    );
+    const oldEndDate =
+      new Date(membership.endDate);
 
-
-    // extend membership expiration
+    // extend membership expiration once
     membership.endDate.setDate(
-      membership.endDate.getDate() + days,
+      membership.endDate.getDate() + daysRequested,
     );
 
+    const today = new Date();
 
-    membership.status = MembershipStatus.FROZEN;
+    today.setHours(0, 0, 0, 0);
+    start.setHours(0, 0, 0, 0);
 
-    membership.freezesUsed++;
+    if (start.getTime() === today.getTime()) {
 
+      membership.status =
+        MembershipStatus.FROZEN;
+
+    }
+
+    membership.freezeDaysUsed += daysRequested;
 
     await this.membershipRepository.save(
-      membership,
+      membership
     );
-
 
     const freeze =
       this.membershipFreezeRepository.create({
 
         membership,
 
-        startDate,
+        startDate: start,
 
-        endDate,
+        endDate: end,
+
+        daysUsed: daysRequested,
+
+        previousEndDate: oldEndDate
 
       });
-
 
     return this.membershipFreezeRepository.save(
       freeze,
     );
   }
 
-  async activateExpiredMemberships() {
+  async updateMembershipFreezeStatuses() {
 
     const freezes =
       await this.membershipFreezeRepository.find({
@@ -398,29 +449,50 @@ export class MembershipService {
         },
       });
 
-
-    const now = new Date();
-
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     for (const freeze of freezes) {
 
+      const startDate = new Date(freeze.startDate);
+      startDate.setHours(0, 0, 0, 0);
 
+      const endDate = new Date(freeze.endDate);
+      endDate.setHours(0, 0, 0, 0);
+
+      // Membership should become frozen today
       if (
-        freeze.endDate <= now &&
-        freeze.membership.status === MembershipStatus.FROZEN
+        startDate.getTime() === today.getTime() &&
+        freeze.membership.status === MembershipStatus.ACTIVE
       ) {
 
-        freeze.membership.status = MembershipStatus.ACTIVE;
-
+        freeze.membership.status = MembershipStatus.FROZEN;
 
         await this.membershipRepository.save(
           freeze.membership,
         );
 
+        continue;
       }
 
-    }
+      // Freeze period finished
+      if (
+        endDate < today &&
+        freeze.membership.status === MembershipStatus.FROZEN
+      ) {
 
+        // Don't reactivate expired memberships
+        if (freeze.membership.endDate < today) {
+          freeze.membership.status = MembershipStatus.EXPIRED;
+        } else {
+          freeze.membership.status = MembershipStatus.ACTIVE;
+        }
+
+        await this.membershipRepository.save(
+          freeze.membership,
+        );
+      }
+    }
   }
 
   async unfreezeMembership(
@@ -434,17 +506,11 @@ export class MembershipService {
         },
       });
 
-
     if (!membership) {
-      throw new NotFoundException('Membership not found');
+      throw new NotFoundException(
+        'Membership not found'
+      );
     }
-
-
-    if (membership.status !== MembershipStatus.FROZEN) {
-      throw new BadRequestException('Membership is not frozen');
-    }
-
-
 
     const freeze =
       await this.membershipFreezeRepository.findOne({
@@ -458,61 +524,249 @@ export class MembershipService {
         },
       });
 
-
-
     if (!freeze) {
-      throw new NotFoundException('Freeze record not found');
+      throw new NotFoundException(
+        'Freeze record not found'
+      );
     }
 
-
-
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
+    const startDate =
+      new Date(freeze.startDate);
 
-    const remainingDays =
-      Math.ceil(
-        (
-          freeze.endDate.getTime()
-          -
-          today.getTime()
-        )
-        /
-        (1000 * 60 * 60 * 24)
+    startDate.setHours(0, 0, 0, 0);
+
+    /*
+      CASE 1:
+      Freeze was scheduled but didn't start yet
+  
+      Example:
+      freeze:
+      30/07 -> 05/08
+  
+      today:
+      26/07
+  
+      Remove everything
+    */
+
+    if (today < startDate) {
+
+      membership.endDate =
+        freeze.previousEndDate;
+
+      this.restoreFreezeDays(
+        membership,
+        freeze.daysUsed
       );
 
+      membership.status =
+        MembershipStatus.ACTIVE;
 
+      await this.membershipRepository.save(
+        membership
+      );
 
-    if (remainingDays > 0) {
+      await this.membershipFreezeRepository.remove(
+        freeze
+      );
+
+      return {
+        message:
+          "Scheduled freeze cancelled successfully"
+      };
+    }
+    /*
+      CASE 2:
+      Freeze started today and customer cancels today
+  
+      Example:
+  
+      Freeze:
+      26/07 -> 30/07
+  
+      Today:
+      26/07
+  
+      Consumed:
+      0 days
+  
+      Return everything
+    */
+    if (today.getTime() === startDate.getTime()) {
+
+      membership.endDate =
+        freeze.previousEndDate;
+
+      this.restoreFreezeDays(
+        membership,
+        freeze.daysUsed
+      );
+
+      membership.status =
+        MembershipStatus.ACTIVE;
+
+      await this.membershipRepository.save(
+        membership
+      );
+
+      await this.membershipFreezeRepository.remove(
+        freeze
+      );
+
+      return {
+        message:
+          "Membership unfrozen successfully"
+      };
+
+    }
+    /*
+      CASE 3:
+      Freeze already consumed some days
+  
+      Example:
+  
+      Freeze:
+      26/07 -> 30/07
+  
+      Today:
+      28/07
+  
+      Used:
+      3 days
+    */
+
+    const consumedDays =
+      this.calculateFreezeDays(
+        startDate,
+        today
+      );
+
+    const unusedDays =
+      freeze.daysUsed - consumedDays;
+
+    /*
+      Remove only unused extension
+    */
+
+    if (unusedDays > 0) {
 
       membership.endDate.setDate(
         membership.endDate.getDate()
         -
-        remainingDays
+        unusedDays
       );
+
+      membership.freezeDaysUsed -=
+        unusedDays;
+
+      if (membership.freezeDaysUsed < 0)
+        membership.freezeDaysUsed = 0;
 
     }
 
+    membership.status =
+      MembershipStatus.ACTIVE;
 
+    freeze.endDate =
+      today;
 
-    membership.status = MembershipStatus.ACTIVE;
-
-
-
-    freeze.endDate = today;
-
-
+    freeze.daysUsed =
+      consumedDays;
 
     await this.membershipRepository.save(
       membership
     );
 
-
     await this.membershipFreezeRepository.save(
       freeze
     );
 
+    return {
+      message:
+        "Membership unfrozen successfully",
+      membership
+    };
 
-    return membership;
+  }
+
+  async cancelFreeze(
+    membershipId: number,
+    freezeId: number,
+  ) {
+
+    const membership =
+      await this.membershipRepository.findOne({
+        where: {
+          id: membershipId,
+        },
+      });
+
+
+    if (!membership) {
+      throw new NotFoundException(
+        'Membership not found'
+      );
+    }
+
+    const freeze =
+      await this.membershipFreezeRepository.findOne({
+        where: {
+          id: freezeId,
+          membership: {
+            id: membershipId,
+          },
+        },
+      });
+
+    if (!freeze) {
+      throw new NotFoundException(
+        'Freeze record not found'
+      );
+    }
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    const startDate =
+      new Date(freeze.startDate);
+
+    startDate.setHours(0, 0, 0, 0);
+
+    // only future freeze can be cancelled
+    if (startDate <= today) {
+
+      throw new BadRequestException(
+        'Cannot cancel active freeze'
+      );
+
+    }
+
+    // return membership to original expiration date
+
+    membership.endDate =
+      freeze.previousEndDate;
+
+    this.restoreFreezeDays(
+      membership,
+      freeze.daysUsed
+    );
+
+    await this.membershipRepository.save(
+      membership
+    );
+
+    await this.membershipFreezeRepository.remove(
+      freeze
+    );
+
+    return {
+      message:
+        'Freeze cancelled successfully',
+    };
 
   }
 
@@ -538,7 +792,6 @@ export class MembershipService {
           },
         )
         .execute();
-
 
     return result.affected ?? 0;
   }
@@ -598,7 +851,6 @@ export class MembershipService {
     return benefit;
   }
 
-
   async checkPtSessionsAvailable(
     customerId: string,
   ): Promise<boolean> {
@@ -611,7 +863,6 @@ export class MembershipService {
 
     return benefit.remainingValue > 0;
   }
-
 
   async deductPtSession(
     customerId: string,
@@ -658,13 +909,11 @@ export class MembershipService {
     );
   }
 
-
   async purchasePackage(
     dto: CreatePtPackageDto & { customerId: string }
   ) {
 
     let sessionsTotal: number;
-
 
     switch (dto.packageType) {
 
@@ -672,16 +921,13 @@ export class MembershipService {
         sessionsTotal = 20;
         break;
 
-
       case '40':
         sessionsTotal = 40;
         break;
 
-
       case '60':
         sessionsTotal = 60;
         break;
-
 
       default:
         throw new BadRequestException(
@@ -689,7 +935,6 @@ export class MembershipService {
         );
 
     }
-
 
     const packageEntity =
       this.ptPackageRepository.create({
@@ -709,13 +954,11 @@ export class MembershipService {
 
       });
 
-
     return this.ptPackageRepository.save(
       packageEntity
     );
 
   }
-
 
   async getPackageTypes() {
 
@@ -757,7 +1000,6 @@ export class MembershipService {
     packageId: string,
   ): Promise<PtPackage> {
 
-
     const ptPackage =
       await this.ptPackageRepository.findOne({
 
@@ -768,7 +1010,6 @@ export class MembershipService {
 
       });
 
-
     if (!ptPackage) {
 
       throw new NotFoundException(
@@ -776,7 +1017,6 @@ export class MembershipService {
       );
 
     }
-
 
     return ptPackage;
 
@@ -786,10 +1026,8 @@ export class MembershipService {
     packageId: string,
   ): Promise<boolean> {
 
-
     const ptPackage =
       await this.getActivePackage(packageId);
-
 
     return (
       ptPackage.sessionsUsed <
@@ -801,10 +1039,8 @@ export class MembershipService {
     packageId: string,
   ): Promise<void> {
 
-
     const ptPackage =
       await this.getActivePackage(packageId);
-
 
     if (
       ptPackage.sessionsUsed >=
@@ -817,9 +1053,7 @@ export class MembershipService {
 
     }
 
-
     ptPackage.sessionsUsed++;
-
 
     if (
       ptPackage.sessionsUsed ===
@@ -831,7 +1065,6 @@ export class MembershipService {
 
     }
 
-
     await this.ptPackageRepository.save(
       ptPackage,
     );
@@ -840,7 +1073,6 @@ export class MembershipService {
   async refundPackageSession(
     packageId: string,
   ): Promise<void> {
-
 
     const ptPackage =
       await this.ptPackageRepository.findOne({
@@ -851,7 +1083,6 @@ export class MembershipService {
 
       });
 
-
     if (!ptPackage) {
 
       throw new NotFoundException(
@@ -860,7 +1091,6 @@ export class MembershipService {
 
     }
 
-
     if (
       ptPackage.sessionsUsed > 0
     ) {
@@ -868,7 +1098,6 @@ export class MembershipService {
       ptPackage.sessionsUsed--;
 
     }
-
 
     if (
       ptPackage.status ===
@@ -879,7 +1108,6 @@ export class MembershipService {
         PtPackageStatus.ACTIVE;
 
     }
-
 
     await this.ptPackageRepository.save(
       ptPackage,
@@ -908,7 +1136,6 @@ export class MembershipService {
       );
 
     }
-
 
     return ptPackage.trainerId;
 

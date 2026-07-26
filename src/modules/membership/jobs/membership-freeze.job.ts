@@ -16,7 +16,7 @@ constructor(
 @Cron('0 0 * * *')
 async handleExpiredFreezes(){
 
- await this.membershipService.activateExpiredMemberships();
+ await this.membershipService.updateMembershipFreezeStatuses();
 
 }
 }
