@@ -14,6 +14,7 @@ import { MembershipBenefit } from './entities/membership-benefit.entity';
 import { PtPackage } from './entities/pt-package.entity';
 import { PtPackageStatus } from './enum/pt-package-status.enum';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
+import { EventPublisher } from 'src/events/publishers';
 
 @Injectable()
 export class MembershipService {
@@ -31,6 +32,7 @@ export class MembershipService {
     @InjectRepository(PtPackage)
     private readonly ptPackageRepository:
       Repository<PtPackage>,
+    private events: EventPublisher
   ) { }
 
   private normalizeDate(date: Date): Date {
@@ -949,15 +951,25 @@ export class MembershipService {
 
         sessionsUsed: 0,
 
-        status:
-          PtPackageStatus.PENDING_PAYMENT,
+        status: PtPackageStatus.ACTIVE,
 
       });
+    const savedPackage =
+      await this.ptPackageRepository.save(packageEntity);
 
-    return this.ptPackageRepository.save(
-      packageEntity
+    // Notify other services that the package was purchased
+    await this.events.publish(
+      'PT_PACKAGE_PURCHASED',
+      {
+        ptPackageId: savedPackage.id,
+        customerId: savedPackage.customerId,
+        trainerId: savedPackage.trainerId,
+        packageType: savedPackage.packageType,
+        sessionsTotal: savedPackage.sessionsTotal,
+      },
     );
 
+    return savedPackage;
   }
 
   async getPackageTypes() {
@@ -1145,4 +1157,97 @@ export class MembershipService {
   ): Promise<void> {
     await this.getActiveMembership(customerId);
   }
+
+  async getBookableSources(customerId: string) {
+  const packages = await this.ptPackageRepository.find({
+    where: {
+      customerId,
+      status: PtPackageStatus.ACTIVE,
+    },
+    order: {
+      purchasedAt: 'DESC',
+    },
+  });
+
+  let freeSessions = 0;
+
+  try {
+    const membership =
+      await this.getActiveMembership(customerId);
+
+    const benefit =
+      await this.getPtBenefit(membership.id);
+
+    freeSessions = benefit.remainingValue;
+  } catch {
+    freeSessions = 0;
+  }
+
+  return {
+    packages: packages
+      .filter(
+        (pkg) =>
+          pkg.sessionsUsed < pkg.sessionsTotal,
+      )
+      .map((pkg) => ({
+        id: pkg.id,
+        packageType: pkg.packageType,
+        trainerId: pkg.trainerId,
+        sessionsTotal: pkg.sessionsTotal,
+        sessionsUsed: pkg.sessionsUsed,
+        remainingSessions:
+          pkg.sessionsTotal -
+          pkg.sessionsUsed,
+        status: pkg.status,
+      })),
+
+    freeSessions,
+  };
+}
+
+async getCustomerPackageForBooking(
+  customerId: string,
+  packageId: string,
+): Promise<PtPackage> {
+  const ptPackage =
+    await this.ptPackageRepository.findOne({
+      where: {
+        id: packageId,
+        customerId,
+        status: PtPackageStatus.ACTIVE,
+      },
+    });
+
+  if (!ptPackage) {
+    throw new NotFoundException(
+      'Active package not found',
+    );
+  }
+
+  if (
+    ptPackage.sessionsUsed >=
+    ptPackage.sessionsTotal
+  ) {
+    throw new BadRequestException(
+      'No sessions remaining in this package',
+    );
+  }
+
+  return ptPackage;
+}
+
+async getPtBookingCredits(customerId: string) {
+
+  const membership =
+    await this.getActiveMembership(customerId);
+
+  const benefit =
+    await this.getPtBenefit(membership.id);
+
+  return {
+    available: benefit.remainingValue > 0,
+    remaining: benefit.remainingValue,
+  };
+}
+
 }
