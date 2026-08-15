@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   Index,
 } from 'typeorm';
+
 import { ClassSession } from './class-session.entity';
 import { TrainerSlot } from './trainer-slot.entity';
 
@@ -15,48 +16,79 @@ export class Booking {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // soft reference -> profile-service, no real FK, plain column only
   @Index()
   @Column({ name: 'customer_id' })
   customerId: string;
 
-  @Column({ name: 'class_session_id', type: 'uuid', nullable: true })
+  @Column({
+    name: 'class_session_id',
+    type: 'uuid',
+    nullable: true,
+  })
   classSessionId: string | null;
 
-  @Column({ name: 'trainer_slot_id', type: 'uuid', nullable: true })
+  @Column({
+    name: 'trainer_slot_id',
+    type: 'uuid',
+    nullable: true,
+  })
   trainerSlotId: string | null;
 
-  @Column() // "class" | "pt_session"
+  // Trainer assigned to the booking.
+  // For package: known from package.
+  // For free/membership: assigned by backend.
+  @Column({
+    name: 'trainer_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  trainerId: string | null;
+
+  @Column()
   type: string;
 
-  @Column({ default: 'confirmed' }) // "pending_payment" | "confirmed" | "cancelled" | "rescheduled"
+  @Column({ default: 'confirmed' })
   status: string;
 
-  // only meaningful when type = 'pt_session'
-  @Column({ default: 'membership' }) // "membership" | "package"
-  sessionSource: string;
+  // package | free
+  @Column({
+    name: 'source_type',
+    nullable: true,
+    type: 'varchar',
+  })
+  sourceType: string | null;
 
-  // soft reference -> membership-service's pt_packages table, no real FK
-  @Column({ name: 'pt_package_id', type: 'uuid', nullable: true })
-  ptPackageId: string | null;
+  // package ID for package bookings.
+  // null for membership/free-credit bookings.
+  @Column({
+    name: 'source_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  sourceId: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+  })
   createdAt: Date;
 
-  @ManyToOne(() => ClassSession, (session) => session.bookings, { nullable: true })
-  @JoinColumn({ name: 'class_session_id' })
+  @ManyToOne(
+    () => ClassSession,
+    (session) => session.bookings,
+    { nullable: true },
+  )
+  @JoinColumn({
+    name: 'class_session_id',
+  })
   classSession: ClassSession | null;
 
-  @ManyToOne(() => TrainerSlot, (slot) => slot.bookings, { nullable: true })
-  @JoinColumn({ name: 'trainer_slot_id' })
+  @ManyToOne(
+    () => TrainerSlot,
+    (slot) => slot.bookings,
+    { nullable: true },
+  )
+  @JoinColumn({
+    name: 'trainer_slot_id',
+  })
   trainerSlot: TrainerSlot | null;
 }
-
-// Note: the partial unique index enforcing "only one active booking per
-// trainer slot" (WHERE status = 'confirmed') isn't expressible via TypeORM
-// decorators directly — add it as a raw migration once you run
-// `typeorm migration:generate`, right after the initial table creation:
-//
-// CREATE UNIQUE INDEX unique_active_trainer_slot_booking
-// ON bookings (trainer_slot_id)
-// WHERE status = 'confirmed' AND trainer_slot_id IS NOT NULL;
