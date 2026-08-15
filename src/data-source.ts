@@ -14,7 +14,7 @@ import { MembershipBenefit } from './modules/membership/entities/membership-bene
 import { CustomerBenefit } from './modules/membership/entities/customer-benefit.entity';
 import { MembershipFreeze } from './modules/membership/entities/membership-freeze.entity';
 import { PtPackage } from './modules/membership/entities/pt-package.entity';
-
+import { TrainerProfile } from './modules/booking/entities/trainer-profile.entity';
 
 import { Occupancy } from './modules/occupancy/entities/occupancy.entity';
 
@@ -50,6 +50,7 @@ export default new DataSource({
     PtPackage,
 
     Occupancy,
+    TrainerProfile,
   ],
 
 
