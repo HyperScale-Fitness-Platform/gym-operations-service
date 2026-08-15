@@ -8,13 +8,16 @@ import { TrainerSlot } from './entities/trainer-slot.entity';
 import { Booking } from './entities/booking.entity';
 import { MembershipModule } from '../membership/membership.module';
 import { EventPublisher } from '../../events/publishers';
+import { TrainerProfile } from './entities/trainer-profile.entity';
+import { TrainerConsumerService } from '../../events/trainer-consumer.service';
+
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Class, ClassSession, TrainerSlot, Booking]),
+    TypeOrmModule.forFeature([Class, ClassSession, TrainerSlot, Booking, TrainerProfile]),
     MembershipModule,
   ],
   controllers: [BookingController],
-  providers: [BookingService, EventPublisher],
+  providers: [BookingService, EventPublisher, TrainerConsumerService],
 })
 export class BookingModule {}
