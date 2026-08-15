@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Headers } from '@nestjs/common';
+import {Controller,Get,Post,Patch,Delete,Body,Param,Headers,Query} from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateClassDto } from './dto/create-class.dto';
@@ -9,7 +9,14 @@ import { UpdateClassDto } from './dto/update-class.dto';
 
 @Controller()
 export class BookingController {
-  constructor(private bookingService: BookingService) { }
+
+  constructor(
+    private bookingService: BookingService,
+  ) {}
+
+  // ==========================================
+  // CLASSES
+  // ==========================================
 
   @Get('classes')
   getClasses() {
@@ -17,63 +24,165 @@ export class BookingController {
   }
 
   @Get('classes/:id/sessions')
-  getClassSessions(@Param('id') classId: string) {
-    return this.bookingService.getClassSessions(classId);
+  getClassSessions(
+    @Param('id') classId: string,
+  ) {
+    return this.bookingService.getClassSessions(
+      classId,
+    );
+  }
+
+  // ==========================================
+  // PT BOOKING SOURCES
+  // ==========================================
+
+  @Get('bookable-sources')
+  getBookableSources(
+    @Headers('user-id') customerId: string,
+  ) {
+    return this.bookingService.getBookableSources(
+      customerId,
+    );
+  }
+
+  // ==========================================
+  // FREE CREDIT AVAILABILITY
+  // ==========================================
+
+  @Get('pt/free-availability')
+  getFreePtAvailability(
+    @Query('date') date?: string,
+  ) {
+    return this.bookingService.getFreePtAvailability(
+      date,
+    );
+  }
+
+  // ==========================================
+  // TRAINERS
+  // ==========================================
+
+  @Get('trainers/available')
+  getAvailableTrainers() {
+    return this.bookingService.getAvailableTrainers();
   }
 
   @Get('trainers/:id/slots')
-  getTrainerSlots(@Param('id') trainerId: string) {
-    return this.bookingService.getTrainerSlots(trainerId);
+  getTrainerSlots(
+    @Param('id') trainerId: string,
+  ) {
+    return this.bookingService.getTrainerSlots(
+      trainerId,
+    );
   }
 
-  // slots filtered to the trainer this PT package is locked to
+  // ==========================================
+  // PACKAGE AVAILABILITY
+  // ==========================================
+
   @Get('pt-packages/:packageId/available-slots')
-  getSlotsForPackage(@Param('packageId') packageId: string) {
-    return this.bookingService.getSlotsForPackage(packageId);
+  getSlotsForPackage(
+    @Param('packageId') packageId: string,
+    @Headers('user-id') customerId: string,
+  ) {
+    return this.bookingService.getSlotsForPackage(
+      customerId,
+      packageId,
+    );
   }
+
+  // ==========================================
+  // CUSTOMER BOOKINGS
+  // ==========================================
 
   @Get('customers/:id/bookings')
-  getCustomerBookings(@Param('id') customerId: string) {
-    return this.bookingService.getCustomerBookings(customerId);
+  getCustomerBookings(
+    @Param('id') customerId: string,
+  ) {
+    return this.bookingService.getCustomerBookings(
+      customerId,
+    );
   }
+
+  // ==========================================
+  // CREATE BOOKING
+  // ==========================================
 
   @Post('bookings')
   createBooking(
     @Body() dto: CreateBookingDto,
     @Headers('user-id') customerId: string,
   ) {
-    return this.bookingService.createBooking(customerId, dto);
+    return this.bookingService.createBooking(
+      customerId,
+      dto,
+    );
   }
+
+  // ==========================================
+  // CANCEL
+  // ==========================================
 
   @Delete('bookings/:id')
-  cancelBooking(@Param('id') id: string) {
-    return this.bookingService.cancelBooking(id);
+  cancelBooking(
+    @Param('id') id: string,
+  ) {
+    return this.bookingService.cancelBooking(
+      id,
+    );
   }
 
-  // --- Admin/Trainer endpoints ---
+  // ==========================================
+  // ADMIN / TRAINER
+  // ==========================================
 
   @Post('classes')
-  createClass(@Body() dto: CreateClassDto) {
+  createClass(
+    @Body() dto: CreateClassDto,
+  ) {
     return this.bookingService.createClass(dto);
   }
 
   @Post('classes/:id/sessions')
-  createClassSession(@Param('id') classId: string, @Body() dto: CreateClassSessionDto) {
-    return this.bookingService.createClassSession(classId, dto);
+  createClassSession(
+    @Param('id') classId: string,
+    @Body() dto: CreateClassSessionDto,
+  ) {
+    return this.bookingService.createClassSession(
+      classId,
+      dto,
+    );
   }
 
   @Post('trainers/:id/slots')
-  createTrainerSlot(@Param('id') trainerId: string, @Body() dto: CreateTrainerSlotDto) {
-    return this.bookingService.createTrainerSlot(trainerId, dto);
+  createTrainerSlot(
+    @Param('id') trainerId: string,
+    @Body() dto: CreateTrainerSlotDto,
+  ) {
+    return this.bookingService.createTrainerSlot(
+      trainerId,
+      dto,
+    );
   }
 
   @Get('trainers/:id/schedule')
-  getTrainerSchedule(@Param('id') trainerId: string) {
-    return this.bookingService.getTrainerSchedule(trainerId);
+  getTrainerSchedule(
+    @Param('id') trainerId: string,
+  ) {
+    return this.bookingService.getTrainerSchedule(
+      trainerId,
+    );
   }
 
+  // ==========================================
+  // RESCHEDULE
+  // ==========================================
+
   @Patch('bookings/:id/reschedule')
-  rescheduleBooking(@Param('id') id: string, @Body() dto: RescheduleBookingDto) {
+  rescheduleBooking(
+    @Param('id') id: string,
+    @Body() dto: RescheduleBookingDto,
+  ) {
     return this.bookingService.rescheduleBooking(
       id,
       dto.newClassSessionId,
@@ -81,8 +190,18 @@ export class BookingController {
     );
   }
 
+  // ==========================================
+  // UPDATE CLASS
+  // ==========================================
+
   @Patch('classes/:id')
-  updateClass(@Param('id') id: string, @Body() dto: UpdateClassDto) {
-    return this.bookingService.updateClass(id, dto);
+  updateClass(
+    @Param('id') id: string,
+    @Body() dto: UpdateClassDto,
+  ) {
+    return this.bookingService.updateClass(
+      id,
+      dto,
+    );
   }
 }
