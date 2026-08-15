@@ -1,22 +1,42 @@
-import { IsUUID, IsIn, ValidateIf } from 'class-validator';
+import {
+  IsUUID,
+  IsIn,
+  ValidateIf,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateBookingDto {
   @IsIn(['class', 'pt_session'])
   type: 'class' | 'pt_session';
 
+  // =========================
+  // CLASS BOOKING
+  // =========================
+
   @ValidateIf((dto) => dto.type === 'class')
   @IsUUID()
   classSessionId?: string;
 
-  @ValidateIf((dto) => dto.type === 'pt_session')
-  @IsUUID()
-  trainerSlotId?: string;
+  // =========================
+  // PT BOOKING
+  // =========================
 
   @ValidateIf((dto) => dto.type === 'pt_session')
-  @IsIn(['membership', 'package'])
-  sessionSource?: 'membership' | 'package';
+  @IsIn(['package', 'free'])
+  sourceType?: 'package' | 'free';
 
-  @ValidateIf((dto) => dto.sessionSource === 'package')
+  // Required only for package bookings
+  @ValidateIf(
+    (dto) =>
+      dto.type === 'pt_session' &&
+      dto.sourceType === 'package',
+  )
   @IsUUID()
-  ptPackageId?: string;
+  sourceId?: string;
+
+  // The customer chooses a time.
+  // The backend chooses the trainer.
+  @ValidateIf((dto) => dto.type === 'pt_session')
+  @IsDateString()
+  slotStart?: string;
 }
