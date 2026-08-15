@@ -10,7 +10,7 @@ export class ClassSession {
   @Column({ name: 'class_id' })
   classId: string;
 
-  @Column({ name: 'trainer_id' })
+  @Column({ name: 'trainer_id', type: 'uuid' })
   trainerId: string;
 
   @Column({ name: 'start_time', type: 'timestamptz' })
