@@ -7,9 +7,9 @@ export class TrainerSlot {
   id: string;
 
   @Index()
-  @Column({ name: 'trainer_id' })
+  @Column({ name: 'trainer_id', type: 'uuid' })
   trainerId: string;
-
+  
   @Column({ name: 'start_time', type: 'timestamptz' })
   startTime: Date;
 
