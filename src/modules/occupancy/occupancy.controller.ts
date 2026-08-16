@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Headers } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Post} from '@nestjs/common';
 
 import { OccupancyService } from './occupancy.service';
 import { CheckInDto } from './dto/checkin.dto';
@@ -8,20 +8,34 @@ import { CheckOutDto } from './dto/checkout.dto';
 export class OccupancyController {
   constructor(
     private readonly occupancyService: OccupancyService,
-  ) { }
+  ) {}
 
   @Post('checkin')
   checkIn(
-    @Headers('user-id') customerId: string,
+    @Body() dto: CheckInDto,
+    @Headers('user-role') role: string,
   ) {
-    return this.occupancyService.checkIn(customerId);
+    if (role !== 'admin') {
+      throw new ForbiddenException(
+        'Only admins can check in customers',
+      );
+    }
+
+    return this.occupancyService.checkIn(dto.customerId);
   }
 
   @Post('checkout')
   checkOut(
-    @Headers('user-id') customerId: string,
+    @Body() dto: CheckOutDto,
+    @Headers('user-role') role: string,
   ) {
-    return this.occupancyService.checkOut(customerId);
+    if (role !== 'admin') {
+      throw new ForbiddenException(
+        'Only admins can check out customers',
+      );
+    }
+
+    return this.occupancyService.checkOut(dto.customerId);
   }
 
   @Get('current')

@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { OccupancyModule } from './modules/occupancy/occupancy.module';
 import { RedisConfigModule } from './modules/redis/redis.module';
+import { CustomerModule } from './modules/customer/customer.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { RedisConfigModule } from './modules/redis/redis.module';
     BookingModule,
     MembershipModule,
     OccupancyModule,
+    CustomerModule,
   ],
 })
 export class AppModule { }
