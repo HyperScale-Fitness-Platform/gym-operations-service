@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Headers } from '@nestjs/common';
 import { MembershipService } from './membership.service';
 import { FreezeMembershipDto } from './dto/freeze-membership.dto';
 import { SubscribeMembershipDto } from './dto/subscribe-membership.dto';
@@ -104,6 +104,11 @@ export class MembershipController {
 
     }
 
+    @Get('pt-sessions')
+    getSessionTypes() {
+        return this.membershipService.getPackageTypes();
+    }
+
     @Get('pt-packages/types')
     getPackageTypes() {
         return this.membershipService.getPackageTypes();
@@ -115,6 +120,15 @@ export class MembershipController {
     ) {
 
         return this.membershipService.getCustomerPackages(customerId);
+
+    }
+
+    @Delete('pt-packages/:id')
+    deletePendingPackage(
+        @Param('id') packageId: string,
+    ) {
+
+        return this.membershipService.deletePendingPackage(packageId);
 
     }
 }

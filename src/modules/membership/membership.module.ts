@@ -10,12 +10,14 @@ import {MembershipExpirationJob} from './jobs/membership-expiration.job';
 import { MembershipBenefit } from './entities/membership-benefit.entity';
 import { CustomerBenefit } from './entities/customer-benefit.entity';
 import { PtPackage } from './entities/pt-package.entity';
+import { PtSession } from './entities/pt-session.entity';
 import { EventPublisher } from 'src/events/publishers';
+import { PaymentConsumerService } from 'src/events/payment-consumer.service';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([MembershipPlan,Membership,MembershipFreeze,MembershipBenefit,CustomerBenefit, PtPackage])],
+  imports:[TypeOrmModule.forFeature([MembershipPlan,Membership,MembershipFreeze,MembershipBenefit,CustomerBenefit, PtPackage, PtSession])],
   controllers:[MembershipController],
-  providers: [MembershipService,MembershipFreezeJob,MembershipExpirationJob,EventPublisher],
+  providers: [MembershipService,MembershipFreezeJob,MembershipExpirationJob,EventPublisher,PaymentConsumerService],
   exports: [MembershipService,EventPublisher],
 })
 export class MembershipModule {}

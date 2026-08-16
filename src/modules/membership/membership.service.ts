@@ -12,6 +12,7 @@ import { CreatePlanDto } from './dto/create-plan.dto';
 import { CreateBenefitDto } from './dto/create-benefit.dto';
 import { MembershipBenefit } from './entities/membership-benefit.entity';
 import { PtPackage } from './entities/pt-package.entity';
+import { PtSession } from './entities/pt-session.entity';
 import { PtPackageStatus } from './enum/pt-package-status.enum';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
 import { EventPublisher } from 'src/events/publishers';
@@ -32,6 +33,9 @@ export class MembershipService {
     @InjectRepository(PtPackage)
     private readonly ptPackageRepository:
       Repository<PtPackage>,
+    @InjectRepository(PtSession)
+    private readonly ptSessionRepository:
+      Repository<PtSession>,
     private events: EventPublisher
   ) { }
 
@@ -915,29 +919,20 @@ export class MembershipService {
     dto: CreatePtPackageDto & { customerId: string }
   ) {
 
-    let sessionsTotal: number;
+    // Look up the PT session offering from the catalog
+    const session =
+      await this.ptSessionRepository.findOne({
+        where: { id: dto.sessionId },
+      });
 
-    switch (dto.packageType) {
-
-      case '20':
-        sessionsTotal = 20;
-        break;
-
-      case '40':
-        sessionsTotal = 40;
-        break;
-
-      case '60':
-        sessionsTotal = 60;
-        break;
-
-      default:
-        throw new BadRequestException(
-          'Invalid package type'
-        );
-
+    if (!session) {
+      throw new NotFoundException(
+        'PT session offering not found',
+      );
     }
 
+    // Create package as PENDING_PAYMENT — it will only become ACTIVE
+    // once the payment service confirms the charge via Kafka.
     const packageEntity =
       this.ptPackageRepository.create({
 
@@ -945,49 +940,63 @@ export class MembershipService {
 
         trainerId: dto.trainerId,
 
-        packageType: dto.packageType,
+        packageType: String(session.sessions),
 
-        sessionsTotal,
+        sessionsTotal: session.sessions,
 
         sessionsUsed: 0,
 
-        status: PtPackageStatus.ACTIVE,
+        status: PtPackageStatus.PENDING_PAYMENT,
 
       });
+
     const savedPackage =
       await this.ptPackageRepository.save(packageEntity);
 
-    // Notify other services that the package was purchased
-    await this.events.publish(
-      'PT_PACKAGE_PURCHASED',
+    // Call the payment service to create a Stripe PaymentIntent
+    const paymentServiceUrl =
+      process.env.PAYMENT_SERVICE_URL || 'http://localhost:4004';
+
+    const paymentResponse = await fetch(
+      `${paymentServiceUrl}/payments`,
       {
-        ptPackageId: savedPackage.id,
-        customerId: savedPackage.customerId,
-        trainerId: savedPackage.trainerId,
-        packageType: savedPackage.packageType,
-        sessionsTotal: savedPackage.sessionsTotal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': dto.customerId,
+        },
+        body: JSON.stringify({
+          referenceType: 'pt_package',
+          referenceId: savedPackage.id,
+          amountCents: session.priceCents,
+          currency: session.currency || 'egp',
+        }),
       },
     );
 
-    return savedPackage;
+    if (!paymentResponse.ok) {
+      // Payment initiation failed — remove the pending package
+      await this.ptPackageRepository.remove(savedPackage);
+      throw new BadRequestException(
+        'Failed to initiate payment',
+      );
+    }
+
+    const paymentData = await paymentResponse.json();
+
+    return {
+      packageId: savedPackage.id,
+      clientSecret: paymentData.clientSecret,
+    };
   }
 
   async getPackageTypes() {
 
-    return [
-      {
-        type: '20',
-        sessions: 20,
+    return this.ptSessionRepository.find({
+      order: {
+        sessions: 'ASC',
       },
-      {
-        type: '40',
-        sessions: 40,
-      },
-      {
-        type: '60',
-        sessions: 60,
-      },
-    ];
+    });
 
   }
   async getCustomerPackages(
@@ -1248,6 +1257,89 @@ async getPtBookingCredits(customerId: string) {
     available: benefit.remainingValue > 0,
     remaining: benefit.remainingValue,
   };
+}
+
+async activatePackage(
+  packageId: string,
+): Promise<void> {
+
+  const ptPackage =
+    await this.ptPackageRepository.findOne({
+      where: { id: packageId },
+    });
+
+  if (!ptPackage) {
+    console.warn(
+      `[activatePackage] Package ${packageId} not found`,
+    );
+    return;
+  }
+
+  if (ptPackage.status === PtPackageStatus.ACTIVE) {
+    return; // already activated
+  }
+
+  ptPackage.status = PtPackageStatus.ACTIVE;
+
+  await this.ptPackageRepository.save(ptPackage);
+
+  // Notify other services that the package is now active
+  await this.events.publish(
+    'PT_PACKAGE_PURCHASED',
+    {
+      ptPackageId: ptPackage.id,
+      customerId: ptPackage.customerId,
+      trainerId: ptPackage.trainerId,
+      packageType: ptPackage.packageType,
+      sessionsTotal: ptPackage.sessionsTotal,
+    },
+  );
+
+  console.log(
+    `[activatePackage] Package ${packageId} activated`,
+  );
+}
+
+async deletePendingPackage(
+  packageId: string,
+): Promise<void> {
+
+  const ptPackage =
+    await this.ptPackageRepository.findOne({
+      where: {
+        id: packageId,
+        status: PtPackageStatus.PENDING_PAYMENT,
+      },
+    });
+
+  if (!ptPackage) {
+    throw new NotFoundException(
+      'Pending package not found',
+    );
+  }
+
+  await this.ptPackageRepository.remove(ptPackage);
+}
+
+async handlePaymentStatus(
+  referenceId: string,
+  status: string,
+): Promise<void> {
+
+  if (status === 'succeeded') {
+    await this.activatePackage(referenceId);
+  }
+
+  if (status === 'failed') {
+    try {
+      await this.deletePendingPackage(referenceId);
+      console.log(
+        `[handlePaymentStatus] Deleted failed package ${referenceId}`,
+      );
+    } catch {
+      // Package may have already been deleted — that's fine.
+    }
+  }
 }
 
 }

@@ -1,6 +1,5 @@
 import {
  IsUUID,
- IsIn,
 } from 'class-validator';
 
 
@@ -11,11 +10,7 @@ export class CreatePtPackageDto {
  trainerId:string;
 
 
- @IsIn([
-   '20',
-   '40',
-   '60'
- ])
- packageType:string;
+ @IsUUID()
+ sessionId:string;
 
 }
