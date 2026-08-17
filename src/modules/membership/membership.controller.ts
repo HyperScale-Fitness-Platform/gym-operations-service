@@ -5,6 +5,7 @@ import { SubscribeMembershipDto } from './dto/subscribe-membership.dto';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { CreateBenefitDto } from './dto/create-benefit.dto';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
+import { CreatePtSessionDto } from './dto/create-pt-session.dto';
 
 @Controller()
 export class MembershipController {
@@ -44,6 +45,12 @@ export class MembershipController {
             planId,
             dto,
         );
+    }
+    @Delete('plans/:id')
+    deletePlan(
+        @Param('id') id: number,
+    ) {
+        return this.membershipService.deletePlan(id);
     }
     @Post('memberships/subscribe')
     subscribe(
@@ -107,6 +114,13 @@ export class MembershipController {
     @Get('pt-sessions')
     getSessionTypes() {
         return this.membershipService.getPackageTypes();
+    }
+
+    @Post('pt-sessions')
+    createPtSession(
+        @Body() dto: CreatePtSessionDto,
+    ) {
+        return this.membershipService.createPtSession(dto);
     }
 
     @Get('pt-packages/types')

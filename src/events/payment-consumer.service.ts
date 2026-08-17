@@ -47,8 +47,15 @@ export class PaymentConsumerService
             `[Kafka] Received PAYMENT_STATUS: ${payload.referenceType} ${payload.referenceId} → ${payload.status}`,
           );
 
-          // Only handle pt_package references — other types
-          // (e.g. membership) are handled elsewhere.
+          if (payload.referenceType === 'membership') {
+            await this.membershipService.handleMembershipPaymentStatus(
+              payload.referenceId,
+              payload.status,
+            );
+            return;
+          }
+
+          // Only handle pt_package references — other types are ignored.
           if (payload.referenceType !== 'pt_package') {
             return;
           }

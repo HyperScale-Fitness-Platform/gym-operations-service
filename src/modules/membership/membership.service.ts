@@ -15,6 +15,7 @@ import { PtPackage } from './entities/pt-package.entity';
 import { PtSession } from './entities/pt-session.entity';
 import { PtPackageStatus } from './enum/pt-package-status.enum';
 import { CreatePtPackageDto } from './dto/create-pt-package.dto';
+import { CreatePtSessionDto } from './dto/create-pt-session.dto';
 import { EventPublisher } from 'src/events/publishers';
 
 @Injectable()
@@ -194,10 +195,62 @@ export class MembershipService {
 
   }
 
+  async deletePlan(planId: number) {
+
+    const plan =
+      await this.membershipPlanRepository.findOne({
+        where: {
+          id: planId,
+        },
+      });
+
+    if (!plan) {
+      throw new NotFoundException(
+        'Plan not found',
+      );
+    }
+
+    // Cancel every membership subscribed to this plan. This cascades
+    // to the customers' benefits (PT credits) and freezes via FK, so the
+    // customers are left with no plan -- exactly what the admin expects.
+    const memberships =
+      await this.membershipRepository.find({
+        where: {
+          plan: {
+            id: planId,
+          },
+        },
+      });
+
+    for (const membership of memberships) {
+      await this.membershipRepository.remove(
+        membership,
+      );
+    }
+
+    // Soft-delete the plan so it disappears from admin + customer lists
+    // and can no longer be subscribed to.
+    plan.isActive = false;
+
+    await this.membershipPlanRepository.save(
+      plan,
+    );
+
+    return {
+      message: 'Plan deleted',
+      removedMemberships:
+        memberships.length,
+    };
+
+  }
+
   async findAllPlans() {
     return this.membershipPlanRepository.find({
       where: {
         isActive: true,
+      },
+      relations: {
+        benefits: true,
       },
       order: {
         price: 'ASC',
@@ -263,6 +316,16 @@ export class MembershipService {
       );
     }
 
+    // A previous subscription was abandoned before payment was
+    // completed — drop it and start fresh so the payment reference
+    // stays unique for the new membership row.
+    if (
+      existingMembership &&
+      existingMembership.status === MembershipStatus.PENDING_PAYMENT
+    ) {
+      await this.membershipRepository.remove(existingMembership);
+    }
+
     const startDate = new Date();
 
     const endDate = new Date();
@@ -276,14 +339,81 @@ export class MembershipService {
         plan,
         startDate,
         endDate,
-        status: MembershipStatus.ACTIVE,
+        status: MembershipStatus.PENDING_PAYMENT,
         freezeDaysUsed: 0,
       });
 
     const savedMembership =
       await this.membershipRepository.save(membership);
 
-    for (const benefit of plan.benefits) {
+    // Initiate the Stripe PaymentIntent via the payment service.
+    // The membership is only activated once the payment service
+    // confirms the charge through the PAYMENT_STATUS Kafka event.
+    const paymentServiceUrl =
+      process.env.PAYMENT_SERVICE_URL || 'http://localhost:4004';
+
+    const paymentResponse = await fetch(
+      `${paymentServiceUrl}/payments`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': customerId,
+        },
+        body: JSON.stringify({
+          referenceType: 'membership',
+          referenceId: String(savedMembership.id),
+          amountCents: Math.round(plan.price * 100),
+          currency: 'egp',
+        }),
+      },
+    );
+
+    if (!paymentResponse.ok) {
+      await this.membershipRepository.remove(savedMembership);
+      throw new BadRequestException(
+        'Failed to initiate payment',
+      );
+    }
+
+    const paymentData = await paymentResponse.json();
+
+    return {
+      membershipId: savedMembership.id,
+      clientSecret: paymentData.clientSecret,
+    };
+  }
+
+  async activateMembership(
+    membershipId: number,
+  ): Promise<void> {
+
+    const membership =
+      await this.membershipRepository.findOne({
+        where: {
+          id: membershipId,
+        },
+        relations: {
+          plan: {
+            benefits: true,
+          },
+        },
+      });
+
+    if (!membership) {
+      throw new NotFoundException('Membership not found');
+    }
+
+    if (membership.status === MembershipStatus.ACTIVE) {
+      return; // already activated
+    }
+
+    membership.status = MembershipStatus.ACTIVE;
+
+    const savedMembership =
+      await this.membershipRepository.save(membership);
+
+    for (const benefit of membership.plan.benefits) {
 
       const customerBenefit =
         this.customerBenefitRepository.create({
@@ -303,7 +433,29 @@ export class MembershipService {
       );
     }
 
-    return savedMembership;
+  }
+
+  async handleMembershipPaymentStatus(
+    referenceId: string,
+    status: string,
+  ): Promise<void> {
+
+    const membershipId = Number(referenceId);
+
+    if (status === 'succeeded') {
+      await this.activateMembership(membershipId);
+    }
+
+    if (status === 'failed') {
+      // Same reasoning as handlePaymentStatus: a payment_intent.payment_failed
+      // event usually precedes the customer retrying and succeeding. Do not
+      // delete the pending membership — keep it so the later 'succeeded' event
+      // activates it, or the customer can resume/delete it from the UI.
+      console.warn(
+        `[handleMembershipPaymentStatus] Payment failed for membership ${membershipId} — keeping it pending so a retry can succeed`,
+      );
+    }
+
   }
 
   async getCustomerMembership(customerId: string) {
@@ -999,6 +1151,23 @@ export class MembershipService {
     });
 
   }
+
+  async createPtSession(
+    dto: CreatePtSessionDto,
+  ) {
+
+    const session = this.ptSessionRepository.create({
+      name: dto.name,
+      sessions: dto.sessions,
+      priceCents: Math.round(
+        dto.price * 100
+      ),
+      currency: 'egp',
+    });
+
+    return this.ptSessionRepository.save(session);
+
+  }
   async getCustomerPackages(
     customerId: string,
   ) {
@@ -1247,16 +1416,30 @@ async getCustomerPackageForBooking(
 
 async getPtBookingCredits(customerId: string) {
 
-  const membership =
-    await this.getActiveMembership(customerId);
+  try {
 
-  const benefit =
-    await this.getPtBenefit(membership.id);
+    const membership =
+      await this.getActiveMembership(customerId);
 
-  return {
-    available: benefit.remainingValue > 0,
-    remaining: benefit.remainingValue,
-  };
+    const benefit =
+      await this.getPtBenefit(membership.id);
+
+    return {
+      available: benefit.remainingValue > 0,
+      remaining: benefit.remainingValue,
+    };
+
+  }
+  catch {
+
+    // No active membership (e.g. plan was deleted or membership
+    // expired) -- the customer simply has no free PT credits left.
+    return {
+      available: false,
+      remaining: 0,
+    };
+
+  }
 }
 
 async activatePackage(
@@ -1331,14 +1514,16 @@ async handlePaymentStatus(
   }
 
   if (status === 'failed') {
-    try {
-      await this.deletePendingPackage(referenceId);
-      console.log(
-        `[handlePaymentStatus] Deleted failed package ${referenceId}`,
-      );
-    } catch {
-      // Package may have already been deleted — that's fine.
-    }
+    // Do NOT delete the package on a failed event. Stripe emits
+    // payment_intent.payment_failed for a declined/aborted attempt and then a
+    // separate payment_intent.succeeded once the customer retries and pays.
+    // Deleting here would wipe a package the customer actually ends up paying
+    // for (the later 'succeeded' event would find nothing to activate). Keep
+    // the package PENDING_PAYMENT so a subsequent 'succeeded' can activate it,
+    // or the customer can resume/delete it from the UI.
+    console.warn(
+      `[handlePaymentStatus] Payment failed for package ${referenceId} — keeping it pending so a retry can succeed`,
+    );
   }
 }
 

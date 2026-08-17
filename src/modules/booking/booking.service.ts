@@ -908,8 +908,7 @@ export class BookingService {
         .createQueryBuilder('slot')
         .where('slot.status = :status', {
           status: 'open',
-        })
-        .andWhere('slot.start_time > NOW()');
+        });
 
     if (date) {
       query.andWhere(
@@ -918,33 +917,9 @@ export class BookingService {
       );
     }
 
-    const slots = await query
+    return query
       .orderBy('slot.start_time', 'ASC')
       .getMany();
-
-    // Group slots by time.
-    // We don't expose trainers to the customer.
-    const grouped = new Map<
-      string,
-      {
-        startTime: Date;
-        endTime: Date;
-      }
-    >();
-
-    for (const slot of slots) {
-      const key =
-        `${slot.startTime.toISOString()}_${slot.endTime.toISOString()}`;
-
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-        });
-      }
-    }
-
-    return Array.from(grouped.values());
   }
 
   private async assignTrainerForFreeSlot(
