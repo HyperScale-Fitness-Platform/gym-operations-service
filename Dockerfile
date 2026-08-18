@@ -34,6 +34,6 @@ COPY --from=builder /app/src/migrations ./src/migrations
 COPY --from=builder /app/src/modules ./src/modules
 COPY tsconfig.json ./
 
-EXPOSE 3004
+EXPOSE 4001
 
 CMD ["node", "dist/main.js"]

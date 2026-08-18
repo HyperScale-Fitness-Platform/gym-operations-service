@@ -7,6 +7,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { OccupancyModule } from './modules/occupancy/occupancy.module';
 import { RedisConfigModule } from './modules/redis/redis.module';
 import { CustomerModule } from './modules/customer/customer.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { CustomerModule } from './modules/customer/customer.module';
     MembershipModule,
     OccupancyModule,
     CustomerModule,
+    HealthModule,
   ],
 })
 export class AppModule { }

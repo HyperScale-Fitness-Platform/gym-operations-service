@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gym-operations-service
+  namespace: gym-dev
+  labels:
+    app: gym-operations-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gym-operations-service
+  template:
+    metadata:
+      labels:
+        app: gym-operations-service
+    spec:
+      containers:
+        - name: gym-operations-service
+          image: <account-id>.dkr.ecr.<region>.amazonaws.com/gym-operations-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4001
+          envFrom:
+            - configMapRef:
+                name: gym-operations-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: operations-svc-credentials
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: operations-svc-credentials
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4001
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4001
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"

@@ -116,7 +116,7 @@ npm run migration:run
 npm run start:dev
 ```
 
-The API will be available at `http://localhost:3004` (or whatever `PORT` is set to in `.env`).
+The API will be available at `http://localhost:4001` (or whatever `PORT` is set to in `.env`).
 
 ---
 
@@ -134,7 +134,7 @@ DB_PASSWORD=your_password_here
 REDIS_URL=redis://localhost:6379
 
 # App
-PORT=3004
+PORT=4001
 ```
 
 See `.env.example` for a template. `.env` itself is gitignored — never commit real credentials.
